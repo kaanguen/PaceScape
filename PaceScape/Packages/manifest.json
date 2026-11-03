@@ -1,7 +1,19 @@
 {
+  "scopedRegistries": [
+    {
+      "name": "Magic Leap",
+      "url": "https://registry.npmjs.org",
+      "scopes": [
+        "com.magicleap"
+      ]
+    }
+  ],
   "dependencies": {
+    "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
+    "com.magicleap.unitysdk": "2.6.0",
     "com.unity.collab-proxy": "2.12.4",
     "com.unity.feature.development": "1.0.1",
+    "com.unity.render-pipelines.universal": "14.0.12",
     "com.unity.textmeshpro": "3.0.7",
     "com.unity.timeline": "1.7.7",
     "com.unity.ugui": "1.0.0",
