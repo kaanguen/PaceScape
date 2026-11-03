@@ -1,0 +1,59 @@
+# EditorConfig: https://editorconfig.org
+# Place this file in the repository root.
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Unity serialized assets and config are YAML/JSON and are indented by Unity itself
+[*.{yml,yaml,json,asmdef}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# --- Formatting (Allman braces) ---
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_prefer_braces = true:suggestion
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_space_after_keywords_in_control_flow_statements = true
+
+# --- Naming symbols ---
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private, protected, private_protected
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+
+dotnet_naming_symbols.pascal_members.applicable_kinds = class, struct, enum, property, method, event, delegate
+dotnet_naming_symbols.pascal_members.applicable_accessibilities = *
+
+# --- Naming styles ---
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+
+dotnet_naming_style.i_prefix_pascal.required_prefix = I
+dotnet_naming_style.i_prefix_pascal.capitalization = pascal_case
+
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+# --- Naming rules (suggestion = hint only, does not break the build) ---
+dotnet_naming_rule.interfaces_i_prefix.symbols = interfaces
+dotnet_naming_rule.interfaces_i_prefix.style = i_prefix_pascal
+dotnet_naming_rule.interfaces_i_prefix.severity = suggestion
+
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_rule.private_fields_underscore.severity = suggestion
+
+dotnet_naming_rule.members_pascal.symbols = pascal_members
+dotnet_naming_rule.members_pascal.style = pascal
+dotnet_naming_rule.members_pascal.severity = suggestion

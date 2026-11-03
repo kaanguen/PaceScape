@@ -1,82 +1,63 @@
-# PaceScape — repository instructions
+# PaceScape
 
-## Project and stack
+Unity/C# project for AR running training, currently in its initial setup stage. Read [README.md](README.md) for the product overview. All paths below are relative to the repository root.
 
-PaceScape is a Unity/C# project for AR running training, currently at the starter-scene stage. See [README.md](README.md) for the planned experience and setup.
+## Project context and layout
 
-Use the Editor version recorded in `PaceScape/ProjectSettings/ProjectVersion.txt` (currently `2022.3.62f3`). Check `PaceScape/Packages/manifest.json` before relying on a package. AR, treadmill, sensor, and dashboard integrations are not implemented yet; do not assume tools from MarkerML2 exist here.
+- `PaceScape/` is the Unity project; the repository root contains documentation and Git configuration. Open the Unity project subfolder, not the repository root.
+- `PaceScape/ProjectSettings/ProjectVersion.txt` is the source of truth for the Editor version (currently `2022.3.62f3`). Keep code and assets compatible with it.
+- `PaceScape/Packages/manifest.json` declares dependencies; `packages-lock.json` records resolved ones. Change dependencies through Unity Package Manager and include the resulting lockfile changes.
+- `PaceScape/Assets/Scenes/SampleScene.unity` is the existing scene. There are currently no custom C# scripts or project-specific tests. URP, OpenXR, the Magic Leap SDK, BLE, and RunningServer integration are not configured yet.
+- MarkerML2 is a separate, earlier project of the user. Do not assume its tools, packages, or features exist here; treat it as a reference only if the user points to it. <!-- TODO: add one sentence on what MarkerML2 is. -->
+- Place runtime scripts in the matching feature folder under `PaceScape/Assets/Scripts/`, editor tools in `PaceScape/Assets/Editor/`. Create these folders when needed.
 
-## Repository map
+## Language
 
-Paths in this file are relative to the repository root. **Open `PaceScape/` as the Unity project.**
+- Talk to the user in German. Write code, identifiers, code comments, commit messages, and this file in English.
 
-| Path | Responsibility |
-| --- | --- |
-| `PaceScape/Assets/Scenes/` | Unity scenes; currently `SampleScene.unity` |
-| `PaceScape/Assets/Scripts/` | New runtime C# code, organized by feature; create when needed |
-| `PaceScape/Assets/Editor/` | New Editor-only tools; create when needed |
-| `PaceScape/Packages/` | Package manifest and resolved dependency lockfile |
-| `PaceScape/ProjectSettings/` | Shared Editor, serialization, and build configuration |
-| `.gitattributes`, `.gitignore` | LFS tracking and generated-file exclusions |
-| `README.md`, `DISCLAIMER.md` | Human-facing setup and testing disclaimer |
+## Working scope and collaboration
 
-## Setup and commands
+- The user leads the conceptual work and makes scientific and methodological decisions. Implement individual code sections within the agreed scope.
+- Research and explain relevant knowledge and options. Distinguish evidence from assumptions and state uncertainties.
+- Examine concepts critically for scientific soundness. Point out overlooked assumptions and missing information. Do not silently choose scientific methods, training parameters, or evaluation criteria.
+- Avoid unrelated package upgrades, restructuring, and speculative infrastructure. Keep this file aligned with the repository and update it when structure or workflows change.
 
-Run Git commands from the repository root.
+## Git
 
-| Purpose | Command or action |
-| --- | --- |
-| Initialize LFS after cloning | `git lfs install` |
-| Retrieve binary assets | `git lfs pull` |
-| Resolve Unity dependencies | Open `PaceScape/` in the specified Editor and let Package Manager finish importing |
-| Run the starter scene | Open `Assets/Scenes/SampleScene.unity` in Unity and enter Play Mode |
-| Check tracked changes for whitespace errors | `git diff --check` |
-| Review pending binary asset changes | `git lfs status` |
-| Inspect an asset's LFS rule | `git check-attr filter -- <asset-path>` (replace the placeholder with its repository-relative path) |
+- Before editing, run `git status --short` and inspect relevant changes with `git diff -- <path>`. Preserve the user's uncommitted changes.
+- Do not commit, push, create branches, or rewrite history unless the user asks. When asked to commit, use short imperative English messages (e.g. `Add pace display prototype`).
+- Before reporting completion, run `git diff --check` and review `git diff -- <changed-paths>` for unintended edits.
 
-No project-specific automated test command or device build workflow is configured. The Build Settings scene list is empty. Do not invent test results or reuse build commands from another repository.
+## Unity assets and generated files
 
-## Implementation rules
+- Move or rename assets through Unity, or move them together with their `.meta` files. Include `.meta` files for all new assets and folders. Preserve existing GUIDs and references.
+- Do not hand-edit `.unity`, `.prefab`, or other serialized YAML assets unless the user agrees for that specific change. Prefer a small Editor script or step-by-step instructions for the user to perform in the Editor.
+- Follow `.gitattributes` and `.gitignore`. Track binary assets with Git LFS according to the existing rules; keep scripts, text-serialized Unity assets, and `.meta` files in regular Git.
+- Do not edit or commit `Library/`, `Temp/`, `Obj/`, `Logs/`, `UserSettings/`, generated solution/project files, local IDE files, or builds. Do not edit `Library/PackageCache/`.
 
-- Inspect nearby code and settings before editing. Reuse existing implementations before introducing another abstraction.
-- Put training calculations in plain C# where practical; use Unity components to connect them to scenes and hardware. Keep Editor-only APIs out of runtime code.
-- Match component class names to script filenames. Follow naming and formatting conventions in the files being changed.
-- Keep changes within the requested scope. Explain any necessary new dependency; avoid unrelated package upgrades or restructuring. Let Unity resolve the lockfile when dependencies change.
-- The user owns conceptual, scientific, and methodological decisions; identify consequential assumptions instead of silently choosing a training method.
+## C# coding guidelines
 
-## Preservation and Git boundaries
+Style follows the [Unity C# style guide (Unity 6 edition)](https://unity.com/resources/c-sharp-style-guide-unity-6), summarized here so it does not need to be fetched each time. `.editorconfig` in the repository root enforces formatting and naming where possible; if it conflicts with this section, `.editorconfig` wins.
 
-- Preserve existing user edits. Do not reset unrelated work or rewrite history without an explicit request.
-- Move assets through Unity or move their `.meta` files with them. Retain existing GUIDs and serialized references.
-- Preserve `Force Text` serialization and `Visible Meta Files`. Keep text-serialized scenes, prefabs, assets, and `.meta` files in regular Git. Apply the existing LFS rules to binary assets.
-- Do not manually edit or commit generated `Library/`, `Temp/`, `Obj/`, `Logs/`, `UserSettings/`, local IDE state, or build output. These folders are inside the Unity project; consult the root `.gitignore`.
-- Preserve third-party license and attribution files. `DISCLAIMER.md` addresses testing liability and does not grant a software license.
+- Formatting: 4 spaces, Allman braces (opening brace on its own line), always use braces for `if`/`for`/`foreach`, one statement per line.
+- Naming: `PascalCase` for types, methods, properties, events, enums, and public members; `camelCase` for locals and parameters; `_camelCase` for private fields; `I` prefix for interfaces. Use descriptive names; booleans read as questions (`isRunning`, `hasTarget`).
+- Inspector fields: `[SerializeField] private` instead of public fields. Renaming a serialized field loses its scene/prefab value; use `[FormerlySerializedAs]` or ask first.
+- Comments explain why, not what. Add XML summaries for public APIs.
+- Keep `Find*`, `GetComponent`, and allocations out of `Update`; cache references in `Awake`/`Start`.
+- Keep code compatible with the Editor version in `ProjectVersion.txt`. Do not introduce unsupported APIs or language features to follow an example.
+- Where the guide offers alternatives, use the convention already established in the project code. Do not reformat unrelated code or rename serialized fields, assets, or public APIs solely for style.
+- Mention any necessary style deviation in the completion report.
 
-## Verification by change type
+## Verification
 
-- **Every change:** inspect the final diff, run `git diff --check`, and review new files separately because that command does not cover untracked files.
-- **Binary assets:** check `git lfs status` and the asset's filter attribute. A matching binary asset should report `filter: lfs`; check its import and references in Unity when relevant.
-- **C# or dependencies:** let Unity finish importing and compiling, then inspect the Console. If relevant tests exist, run them and report the actual results. Add behavior-focused checks for nontrivial logic where a suitable test setup exists.
-- **Scenes, UI, animations, or interactions:** verify the affected behavior in Play Mode. Hardware-dependent behavior also requires target-device validation once that integration exists.
-- **Installed device apps:** rebuild after changing C#, scenes, or bundled assets. Editor validation alone does not validate a device build.
-- **Documentation only:** check links, paths, and formatting; launching Unity is unnecessary.
+- The agent usually cannot run the Unity Editor. After C# changes, ask the user to let Unity compile and to paste Console errors or warnings. Do not claim the code compiles before the user confirms it.
+- Run relevant existing tests through Unity's Test Runner when available; an empty test suite is not behavior verification.
+- Scenes, UI, placement, and animations must be verified in the Editor. Hardware-related behavior must be verified on the target device.
+- Command-line test workflows and device build tools are not configured yet. Do not invent commands or claim checks that were not performed. If Unity or hardware is unavailable, report the pending checks.
+- Changes to C# code, scenes, or bundled assets require a new device build to take effect on an installed app. Editor verification does not verify installed-device behavior.
+- Documentation-only changes need a content and diff review; no compile or device build is required.
 
-## Security and data
+## Completion report
 
-- Keep credentials, access tokens, private keys, and machine-specific secrets out of versioned files and logs.
-- Keep identifiable participant, session, and sensor recordings out of Git. Use synthetic or anonymized fixtures; do not transmit private recordings to external services without explicit authorization.
-- Validate file, network, and device input at integration boundaries. Do not add telemetry, external data transmission, or device permissions without an agreed requirement.
-
-## Completion and maintenance
-
-Report the outcome, affected files, verification results, and any checks that could not run with their reasons. Distinguish implemented features from plans, Editor checks from device checks, and local edits from commits or pushes.
-
-Update the README when setup or usage changes. Update this file when commands or repository boundaries change. Keep temporary task requirements out of it; add nested `AGENTS.md` files only where a subproject needs different instructions.
-
-## Our Roles
-
-- The user leads the conceptual work and makes scientific and methodological decisions.
-- The agent implements individual code sections within the agreed scope.
-- The agent researches and explains relevant knowledge and options to support the user's thinking.
-- The agent critically examines the user's concepts and decisions for scientific soundness and explains concerns and uncertainties.
-- The agent points out overlooked assumptions, missing information, and relevant considerations the user may have forgotten.
+- Small changes: 2 to 3 sentences covering what changed, which files, and what was not verified.
+- Larger changes: state what changed and which files; checks actually performed and their results; checks not performed (Unity compilation, tests, device verification); material assumptions, style deviations, and limitations; and whether a new device build is needed.
