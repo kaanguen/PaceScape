@@ -288,7 +288,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.1
+  near clip plane: 0.37
   far clip plane: 100
   field of view: 60
   orthographic: 0
@@ -372,7 +372,12 @@ MonoBehaviour:
   _xrOrigin: {fileID: 1994466227}
   _markerPrefab: {fileID: 4069457831767354077, guid: eb443422a80654c09a9dc3a5ebefbdb8, type: 3}
   _anchorManager: {fileID: 1994466229}
+  _planePlacement: {fileID: 1994466230}
   _markerLength: 0.1
+  _startupTimeoutSeconds: 15
+  _startupPhase: 0
+  _startupStatus: 
+  _startupError: 
 --- !u!4 &1614909382
 Transform:
   m_ObjectHideFlags: 0
@@ -506,6 +511,53 @@ MonoBehaviour:
   m_LightCookieSize: {x: 1, y: 1}
   m_LightCookieOffset: {x: 0, y: 0}
   m_SoftShadowQuality: 0
+--- !u!1 &1849586144
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1849586146}
+  - component: {fileID: 1849586145}
+  m_Layer: 0
+  m_Name: AR Session
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1849586145
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1849586144}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3859a92a05d4f5d418cb6ca605290e74, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_AttemptUpdate: 1
+  m_MatchFrameRate: 1
+  m_TrackingMode: 2
+--- !u!4 &1849586146
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1849586144}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1994466226
 GameObject:
   m_ObjectHideFlags: 0
@@ -517,6 +569,8 @@ GameObject:
   - component: {fileID: 1994466228}
   - component: {fileID: 1994466227}
   - component: {fileID: 1994466229}
+  - component: {fileID: 1994466231}
+  - component: {fileID: 1994466230}
   m_Layer: 0
   m_Name: XR Origin
   m_TagString: Untagged
@@ -570,6 +624,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_AnchorPrefab: {fileID: 0}
+--- !u!114 &1994466230
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1994466226}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b0c9de6645474bb6ba05b6aaddd16c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _planeManager: {fileID: 1994466231}
+  _placeOnFloor: 1
+  _queryPadding: 1
+  _maxMarkerPlaneDistance: 0.15
+  _minimumNormalAlignment: 0.9
+--- !u!114 &1994466231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1994466226}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1760703bbd54c04488a8d10600262ab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_PlanePrefab: {fileID: 6888104069987312713, guid: b7d32a9ac7ead44e1a1c4a1000e0b2f8, type: 3}
+  m_DetectionMode: 3
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -577,3 +662,4 @@ SceneRoots:
   - {fileID: 1994466228}
   - {fileID: 1614909382}
   - {fileID: 1751340028}
+  - {fileID: 1849586146}

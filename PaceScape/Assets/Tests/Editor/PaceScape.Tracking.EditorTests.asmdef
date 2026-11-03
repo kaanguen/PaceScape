@@ -1,0 +1,12 @@
+{
+  "name": "PaceScape.Tracking.EditorTests",
+  "references": [
+    "Unity.Collections",
+    "Unity.XR.ARSubsystems",
+    "Unity.XR.ARFoundation",
+    "Unity.XR.CoreUtils"
+  ],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}
