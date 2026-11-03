@@ -1,0 +1,5 @@
+Tool: Built-in image_gen
+Reference: pacescape-logo-v2.png
+Export: PNG, 1280 x 640 pixels
+
+Adapt the reference PaceScape logo into a polished GitHub repository social preview banner. Output a wide 2:1 aspect ratio composition, ideally 1280x640 pixels. Preserve the exact existing identity: purple P monogram, turquoise curved running track, two runners and exact white bold wordmark "PaceScape". Fully opaque solid dark navy background #080F25, no transparency. Arrange the symbol to the left and the large white wordmark to the right, vertically centered together, generous safe margins of at least 8% on all sides. Make the typography and runners crisp and highly visible, visually balanced and immediately legible at thumbnail size. Clean restrained vector-like sports technology branding. No additional words, tagline, GitHub logo, interface, borders or mockup. Keep the background perfectly flat navy so it can be extended seamlessly.

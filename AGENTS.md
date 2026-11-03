@@ -1,14 +1,14 @@
 # PaceScape
 
-Unity/C# project for AR running training, currently in its initial setup stage. Read [README.md](README.md) for the product overview. All paths below are relative to the repository root.
+Unity/C# project for AR running training, currently in its initial setup stage. Read [README.md](README.md) for the product overview and current status. Technical setup and verification notes are in [docs/tracking-setup.md](docs/tracking-setup.md); README branding assets are in `docs/assets/`. All paths below are relative to the repository root.
 
 ## Project context and layout
 
 - `PaceScape/` is the Unity project; the repository root contains documentation and Git configuration. Open the Unity project subfolder, not the repository root.
 - `PaceScape/ProjectSettings/ProjectVersion.txt` is the source of truth for the Editor version (currently `2022.3.62f3`). Keep code and assets compatible with it.
 - `PaceScape/Packages/manifest.json` declares dependencies; `packages-lock.json` records resolved ones. Change dependencies through Unity Package Manager and include the resulting lockfile changes.
-- `PaceScape/Assets/Scenes/SampleScene.unity` is the existing scene. There are currently no custom C# scripts or project-specific tests. URP, OpenXR, the Magic Leap SDK, BLE, and RunningServer integration are not configured yet.
-- MarkerML2 is a separate, earlier project of the user. Do not assume its tools, packages, or features exist here; treat it as a reference only if the user points to it. <!-- TODO: add one sentence on what MarkerML2 is. -->
+- `PaceScape/Assets/Scenes/MarkerTrackingScene.unity` is the current scene. The Magic Leap SDK 2.6.0 and Android OpenXR configuration are present. `PaceScape/Assets/Scripts/Tracking/TagTracker.cs` implements AprilTag 36H11 detection, placement on classified floor planes beneath marker X/Z positions through `MarkerPlanePlacement.cs` (floor mode ignores marker height; legacy strict surface mode remains available), and local OpenXR spatial anchors for the running app (no cross-session storage); marker poses are retained while waiting for asynchronous plane extraction, following MarkerML2; startup is sequenced with phase diagnostics, individual permission requests, active-time timeouts, pause/resume recovery, bounded marker capacity, and explicit retry after failures; scene wiring includes an active AR Session and is configured and checked through Unity MCP; target-device verification remains pending. EditMode regression tests are in `PaceScape/Assets/Tests/Editor/` (`PaceScape.Tracking.EditorTests`); BLE and RunningServer integration are not configured.
+- MarkerML2 (`../MarkerML2/`) is the user's earlier Magic Leap project with marker, floor, and running-track integration. Use it as a read-only reference; do not assume its packages or features exist here. For PaceScape marker tracking, follow the official [Magic Leap OpenXR Marker Understanding documentation](https://developer-docs.magicleap.cloud/docs/guides/unity-openxr/marker-understanding/marker-understanding-overview/), use AprilTag 36H11, and keep the implementation simple.
 - Place runtime scripts in the matching feature folder under `PaceScape/Assets/Scripts/`, editor tools in `PaceScape/Assets/Editor/`. Create these folders when needed.
 
 ## Language

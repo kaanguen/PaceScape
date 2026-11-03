@@ -1,0 +1,9 @@
+Tool: Built-in image_gen
+
+Use case: logo-brand
+Asset type: PNG logo for PaceScape, an augmented reality running training application with a virtual track and running partner.
+Primary request: Design a polished, distinctive minimalist logo combining a flowing running track/path with a subtle P monogram and a sense of forward movement and spatial depth. Pair the symbol with a highly legible modern wordmark.
+Style/medium: Crisp flat vector-like graphic, strong clean geometry, professional sports technology identity. Restrained harmonious colors suitable for running and AR; dark wordmark with a vivid accent in the symbol.
+Composition/framing: One centered logo lockup, symbol above the wordmark, balanced proportions, generous transparent padding. Large enough to read at small sizes.
+Text (verbatim): "PaceScape"
+Constraints: Truly transparent background with alpha. Only the symbol and exact wordmark. No tagline, no mockup, no presentation board, no shadows, no watermark, no background decoration.

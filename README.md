@@ -1,16 +1,43 @@
-# PaceScape
+<div align="center">
 
-PaceScape is a Unity project for augmented reality running training. The planned app overlays a virtual running track and an animated running partner onto the real environment, with treadmill and stadium training, live running statistics, and control through a web dashboard.
+  <img src="docs/assets/pacescape-logo.png" alt="PaceScape" width="520">
 
-The project is in its initial setup stage and currently contains only a sample scene. The running and AR features are not implemented yet.
+  <h3>Lauftraining trifft Augmented Reality.</h3>
+  <p>Eine virtuelle Strecke. Ein Laufpartner. Deine reale Umgebung.</p>
 
-## Getting started
+  <img src="https://img.shields.io/badge/Unity-2022.3-222222?style=flat-square" alt="Unity 2022.3">
+  <img src="https://img.shields.io/badge/Headset-Magic_Leap_2-00CDB5?style=flat-square" alt="Magic Leap 2">
+  <img src="https://img.shields.io/badge/XR-OpenXR-7952FF?style=flat-square" alt="OpenXR">
+  <img src="https://img.shields.io/badge/Status-Früher_Prototyp-7952FF?style=flat-square" alt="Status: Früher Prototyp">
 
-1. Install **Unity 2022.3.62f3** and **Git LFS**.
-2. After cloning, run `git lfs install` and `git lfs pull` in the repository folder.
-3. In Unity Hub, add and open the **`PaceScape/` subfolder** as the Unity project.
-4. Open `Assets/Scenes/SampleScene.unity`.
+  <br><br>
+  <a href="#die-idee">Die Idee</a> &nbsp;·&nbsp;
+  <a href="#entwicklungsstand">Entwicklungsstand</a> &nbsp;·&nbsp;
+  <a href="docs/tracking-setup.md">Dokumentation</a>
 
-Binary assets are managed with Git LFS. Contributor instructions are in [AGENTS.md](AGENTS.md).
+</div>
 
-Before testing on your own hardware, read the [testing disclaimer](DISCLAIMER.md).
+---
+
+## Die Idee
+
+**PaceScape** soll virtuelle Trainingsinhalte mit deiner realen Umgebung verbinden – für das Laufen auf dem **Laufband** und im **Stadion** mit der Magic Leap 2.
+
+| 🛤️ Virtuelle Strecke | 🏃 Virtueller Laufpartner | 📊 Training im Blick |
+| :---: | :---: | :---: |
+| Eine Laufstrecke direkt im Sichtfeld. | Ein animierter Begleiter für dein Training. | Live-Laufdaten und Steuerung über ein Web-Dashboard. |
+
+## Entwicklungsstand
+
+**Die AR-Grundlage entsteht. Die Trainingsfunktionen folgen.**
+
+- **Implementiert:** Unity/OpenXR-Grundgerüst, AprilTag-36H11-Erkennung, Ebenenerkennung und lokale räumliche Anker zur Objektplatzierung.
+- **In Prüfung:** Zuverlässige Erkennung und Platzierung auf der Magic Leap 2. Die vollständige Geräteprüfung steht noch aus.
+- **Geplant:** Virtuelle Laufstrecke, animierter Laufpartner, Live-Laufdaten und Web-Dashboard.
+
+---
+
+<p align="center">
+  <a href="docs/tracking-setup.md">Technische Dokumentation</a> &nbsp;·&nbsp;
+  <a href="DISCLAIMER.md">Hinweise für Gerätetests</a>
+</p>
