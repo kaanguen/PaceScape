@@ -2,7 +2,7 @@
 
 PaceScape is a Unity project for augmented reality running training. The planned app overlays a virtual running track and an animated running partner onto the real environment, with treadmill and stadium training, live running statistics, and control through a web dashboard.
 
-The project is in its initial setup stage. A simple Magic Leap 2 OpenXR AprilTag tracker is implemented; the tracking scene is configured; device verification is still required. The marker-spawned oval and configurable moving cube are implemented; animated companions and connected training data remain planned.
+The project is in its initial setup stage. A simple Magic Leap 2 OpenXR AprilTag tracker is implemented; the tracking scene is configured; device verification is still required. The marker-spawned oval and animated Jogger with configurable live pace are implemented; connected training data remains planned.
 
 ## Getting started
 
@@ -90,9 +90,19 @@ Run the existing `PaceScape.Tracking.EditorTests` assembly, including `RunningTr
 
 ### Runner movement
 
-`TagTracker` exposes `Pace Minutes Per Kilometre` (default 6 = 6:00 min/km = 10 km/h), `Spawn Lane` (1–8), and `Distance Behind Start Line`. Pace changes affect existing objects immediately; lane and start offset apply to newly placed objects. Decimal pace values are decimal minutes (6.5 = 6:30), not minutes/seconds notation.
+`TagTracker` exposes `Pace Minutes Per Kilometre` (default 6 = 6:00 min/km = 10 km/h), `Spawn Lane` (1–8), and `Distance Behind Start Line`. Pace changes set the target speed of existing objects immediately, with a smooth 0.35 s exponential response for physical speed and animation together; lane and start offset apply to newly placed objects. Decimal pace values are decimal minutes (6.5 = 6:30), not minutes/seconds notation.
 
-`RunningTrackMotion` advances the object along the lane centerline and turns it into the tangent direction. Each lane uses its actual centerline radius and circumference, so physical speed stays constant through bends and outer lanes take longer to complete. The track and anchor stay fixed. Objects start moving automatically when their anchor is tracked and the content is visible. Tracking loss, recovery, and background time do not advance the runner; resuming retains the last position. Movement uses Unity's unscaled frame time, keeping the configured physical pace independent of timeScale. The first visible frame after tracking recovery does not advance the object. No treadmill input, animation, or race timing is added.
+`RunningTrackMotion` advances the object along the lane centerline and turns it into the tangent direction. Each lane uses its actual centerline radius and circumference, so physical speed stays constant through bends and outer lanes take longer to complete. The track and anchor stay fixed. Objects start moving automatically when their anchor is tracked and the content is visible. Tracking loss, recovery, and background time do not advance the runner; resuming retains the last position. Movement uses Unity's unscaled frame time, keeping the configured physical pace independent of timeScale. The first visible frame after tracking recovery does not advance the object. No treadmill input or race timing is added.
+
+The scene assigns `Assets/Characters/Jogger/Jogger.prefab`. The controller keeps the Starter Assets Idle and uses three distinct MarkerML2 clips from `Characters/Jogger/Locomotion`: walking, runninig (the source clip name), and sprint. They replace the previous Starter Assets walking/running entries and the duplicate accelerated run entry. MarkerML2 itself is unchanged.
+
+Like MarkerML2, animation timing uses the imported horizontal root velocities: approximately 1.616, 4.297 and 5.582 m/s. These define the blend-tree thresholds. Between them, clips blend at 1x playback. Below walking speed and above sprint speed, `PlaybackRate` scales the corresponding cycle to the requested speed. The previous foot-velocity sample calibration is no longer used. Root motion remains disabled on the Animator: animation velocity calibrates cadence while the track script controls position and heading. This matches average cycle travel, not exact per-frame foot locking, and retargeting can still introduce sliding.
+
+Initial speed is immediate; live pace changes use an exactly integrated 0.35 s exponential response for both physical motion and animation. Invalid pace holds position immediately. Parameter binding waits until the initially hidden Animator is active and initialized. The Animator uses unscaled time and unused footstep callbacks are disabled.
+
+Humanoid placement uses avatar sole heights instead of padded renderer bounds. `RunnerFootPlacement` applies ankle/toe-aware foot IK near the fixed anchor plane and releases elevated feet; it makes no physics queries and does not follow uneven terrain. The controller enables the IK pass and humanoid foot IK. Imported MarkerML2 gait settings are preserved, including their root trajectories.
+
+`RunningTrackTests` checks initially hidden spawning, lane travel, animated leg poses, blended native speed and playback rate for slower/faster pace, frame-independent acceleration and sole-based placement on a tilted plane. A new device build and headset checks are required for perceived naturalness and foot contact.
 
 ## SDK anchor completion correction
 
