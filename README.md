@@ -31,9 +31,9 @@
 
 **Die AR-Grundlage entsteht. Die Trainingsfunktionen folgen.**
 
-- **Implementiert:** Unity/OpenXR-Grundgerüst, AprilTag-36H11-Erkennung, Ebenenerkennung und lokale räumliche Anker zur Objektplatzierung.
+- **Implementiert:** Unity/OpenXR-Grundgerüst, AprilTag-36H11-Erkennung, Ebenenerkennung und lokale räumliche Anker zur gemeinsamen Platzierung von Markerobjekt und ovaler Laufstrecke mit acht Spuren; ein bewegter Würfel mit einstellbarer Pace (Standard 6:00 min/km) und Spurwahl.
 - **In Prüfung:** Zuverlässige Erkennung und Platzierung auf der Magic Leap 2. Die vollständige Geräteprüfung steht noch aus.
-- **Geplant:** Virtuelle Laufstrecke, animierter Laufpartner, Live-Laufdaten und Web-Dashboard.
+- **Geplant:** Animierter Laufpartner, Live-Laufdaten und Web-Dashboard.
 
 ---
 

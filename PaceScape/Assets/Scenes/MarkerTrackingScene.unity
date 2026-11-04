@@ -371,10 +371,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _xrOrigin: {fileID: 1994466227}
   _markerPrefab: {fileID: 4069457831767354077, guid: eb443422a80654c09a9dc3a5ebefbdb8, type: 3}
+  _distanceBehindStartLine: 0.5
+  _spawnLane: 3
+  _paceMinutesPerKilometre: 6
   _anchorManager: {fileID: 1994466229}
   _planePlacement: {fileID: 1994466230}
   _markerLength: 0.1
   _startupTimeoutSeconds: 15
+  _maxTrackedMarkers: 64
   _startupPhase: 0
   _startupStatus: 
   _startupError: 
