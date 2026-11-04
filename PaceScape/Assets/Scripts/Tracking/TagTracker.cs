@@ -5,6 +5,7 @@ using MagicLeap.Android;
 using MagicLeap.OpenXR.Features.MarkerUnderstanding;
 using MagicLeap.OpenXR.Features.Planes;
 using MagicLeap.OpenXR.Features.SpatialAnchors;
+using PaceScape.RunningTrack;
 using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.XR;
@@ -43,6 +44,15 @@ namespace PaceScape.Tracking
 
         [SerializeField] private XROrigin _xrOrigin;
         [SerializeField] private GameObject _markerPrefab;
+        [SerializeField, Min(0f)]
+        [Tooltip("Object distance behind the start line in meters, opposite to the running direction. Applies to newly placed markers.")]
+        private float _distanceBehindStartLine = 0.5f;
+        [SerializeField, Range(1, RunningTrackGeometry.LaneCount)]
+        [Tooltip("Lane for newly spawned objects; 1 is the innermost lane.")]
+        private int _spawnLane = 1;
+        [SerializeField, Min(0.1f)]
+        [Tooltip("Running pace in minutes per kilometre. 6 means 6:00 min/km (10 km/h). Changes also apply to existing runners.")]
+        private float _paceMinutesPerKilometre = 6f;
         [SerializeField] private ARAnchorManager _anchorManager;
         [SerializeField] private MarkerPlanePlacement _planePlacement;
         [SerializeField, Min(0.001f)]
@@ -91,6 +101,7 @@ namespace PaceScape.Tracking
             public ARAnchor Anchor;
             public float CreatedAt;
             public bool HasTracked;
+            public RunningTrackMotion Motion;
         }
 
         private void OnEnable()
@@ -281,6 +292,11 @@ namespace PaceScape.Tracking
         private bool ConfigureReferences(out string error)
         {
             error = null;
+            if (!ValidateRunningConfiguration(out error))
+            {
+                return false;
+            }
+
             ARSession session = FindObjectOfType<ARSession>();
             if (session == null || !session.isActiveAndEnabled)
             {
@@ -350,6 +366,29 @@ namespace PaceScape.Tracking
 
             _controlsAnchorManager = true;
             _anchorManager.enabled = false;
+            return true;
+        }
+
+        private bool ValidateRunningConfiguration(out string error)
+        {
+            error = null;
+            if (_spawnLane < 1 || _spawnLane > RunningTrackGeometry.LaneCount ||
+                !IsPositiveFinite(_paceMinutesPerKilometre) ||
+                float.IsNaN(_distanceBehindStartLine) || float.IsInfinity(_distanceBehindStartLine) ||
+                _distanceBehindStartLine < 0f)
+            {
+                error = "Select a lane from 1 to 8, a finite positive pace, and a finite nonnegative start distance.";
+                return false;
+            }
+
+            if (_markerPrefab != null && (_markerPrefab.GetComponentInChildren<ARAnchor>(true) != null ||
+                _markerPrefab.GetComponentInChildren<Rigidbody>(true) != null ||
+                !_markerPrefab.activeSelf))
+            {
+                error = "Use an active visual marker prefab without ARAnchor or Rigidbody components; the tracker owns movement and anchors.";
+                return false;
+            }
+
             return true;
         }
 
@@ -500,6 +539,16 @@ namespace PaceScape.Tracking
                 return;
             }
 
+            InputDevice head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
+            if (!head.isValid || !head.TryGetFeatureValue(CommonUsages.isTracked, out bool isHeadTracked) ||
+                !isHeadTracked || !head.TryGetFeatureValue(CommonUsages.trackingState, out InputTrackingState headState) ||
+                (headState & (InputTrackingState.Position | InputTrackingState.Rotation)) !=
+                (InputTrackingState.Position | InputTrackingState.Rotation))
+            {
+                HideVisuals();
+                return;
+            }
+
             if (!UpdateVisuals())
             {
                 return;
@@ -560,6 +609,8 @@ namespace PaceScape.Tracking
                 _markers.Add(markerId, CreateVisual(markerId, placementPose));
                 _placedMarkerIds.Add(markerId);
                 LogTrackingEvent($"Creating a session anchor for AprilTag 36H11 {markerId} at {placementPose.position:F3} on the detected surface.");
+                // Bound native creation and content setup to one placement per frame.
+                break;
             }
 
             foreach (ulong markerId in _placedMarkerIds)
@@ -586,9 +637,15 @@ namespace PaceScape.Tracking
                     return false;
                 }
 
-                if (marker.Instance.activeSelf != isTracked)
+                bool wasVisible = marker.Instance.activeSelf;
+                if (wasVisible != isTracked)
                 {
                     marker.Instance.SetActive(isTracked);
+                }
+
+                if (isTracked && wasVisible)
+                {
+                    marker.Motion?.Advance(Time.unscaledDeltaTime, _paceMinutesPerKilometre);
                 }
             }
 
@@ -757,29 +814,73 @@ namespace PaceScape.Tracking
 
         private MarkerVisual PopulateVisual(GameObject anchorObject, ulong markerId)
         {
+            if (!ValidateRunningConfiguration(out string configurationError))
+            {
+                throw new InvalidOperationException(configurationError);
+            }
+
             ARAnchor anchor = anchorObject.AddComponent<ARAnchor>();
+            var content = new GameObject($"AprilTag Content {markerId}");
+            content.transform.SetParent(anchor.transform, false);
+            content.SetActive(false);
             GameObject instance;
             if (_markerPrefab != null)
             {
-                instance = Instantiate(_markerPrefab, anchor.transform, false);
+                instance = Instantiate(_markerPrefab, content.transform, false);
             }
             else
             {
                 instance = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                instance.transform.SetParent(anchor.transform, false);
+                instance.transform.SetParent(content.transform, false);
                 instance.transform.localScale = Vector3.one * _markerLength;
-                Destroy(instance.GetComponent<Collider>());
+                Collider collider = instance.GetComponent<Collider>();
+                if (Application.isPlaying)
+                {
+                    Destroy(collider);
+                }
+                else
+                {
+                    DestroyImmediate(collider);
+                }
             }
 
             instance.name = $"AprilTag 36H11 {markerId}";
             instance.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
             PlaceVisualOnPlane(instance.transform, anchor.transform);
-            instance.SetActive(false);
-            return new MarkerVisual { Instance = instance, Anchor = anchor, CreatedAt = ActiveTime };
+            var motion = new RunningTrackMotion(instance.transform, _spawnLane,
+                _distanceBehindStartLine);
+            // Ground the marker object before adding track bounds, which extend across the oval.
+            RunningTrackVisual.Create(content.transform);
+            return new MarkerVisual { Instance = content, Anchor = anchor, CreatedAt = ActiveTime, Motion = motion };
         }
 
         private static void PlaceVisualOnPlane(Transform visual, Transform anchor)
         {
+            Animator animator = visual.GetComponentInChildren<Animator>(true);
+            if (animator != null && animator.isHuman && animator.avatar != null && animator.avatar.isValid)
+            {
+                Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                if (leftFoot != null && rightFoot != null)
+                {
+                    // Skinned bounds include animation margins, not the actual standing soles.
+                    Vector3 leftSole = leftFoot.position - animator.transform.up *
+                        (animator.leftFeetBottomHeight * animator.transform.lossyScale.y);
+                    Vector3 rightSole = rightFoot.position - animator.transform.up *
+                        (animator.rightFeetBottomHeight * animator.transform.lossyScale.y);
+                    float soleHeight = Mathf.Min(anchor.InverseTransformPoint(leftSole).y,
+                        anchor.InverseTransformPoint(rightSole).y);
+                    visual.localPosition -= Vector3.up * soleHeight;
+                    RunnerFootPlacement footPlacement = animator.GetComponent<RunnerFootPlacement>();
+                    if (footPlacement != null)
+                    {
+                        footPlacement.Configure(anchor);
+                    }
+
+                    return;
+                }
+            }
+
             Renderer[] renderers = visual.GetComponentsInChildren<Renderer>(true);
             float nearestSurface = float.PositiveInfinity;
             foreach (Renderer renderer in renderers)
@@ -807,6 +908,12 @@ namespace PaceScape.Tracking
 
         private static void DestroyOwnedObject(GameObject instance)
         {
+            // Unity does not guarantee OnDestroy for components that have never been active.
+            foreach (RunningTrackVisual track in instance.GetComponentsInChildren<RunningTrackVisual>(true))
+            {
+                track.ReleaseGeneratedResources();
+            }
+
             if (Application.isPlaying)
             {
                 Destroy(instance);
