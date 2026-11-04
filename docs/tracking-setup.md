@@ -2,7 +2,7 @@
 
 PaceScape is a Unity project for augmented reality running training. The planned app overlays a virtual running track and an animated running partner onto the real environment, with treadmill and stadium training, live running statistics, and control through a web dashboard.
 
-The project is in its initial setup stage. A simple Magic Leap 2 OpenXR AprilTag tracker is implemented; the tracking scene is configured; device verification is still required. The running features are not implemented yet.
+The project is in its initial setup stage. A simple Magic Leap 2 OpenXR AprilTag tracker is implemented; the tracking scene is configured; device verification is still required. The marker-spawned oval and configurable moving cube are implemented; animated companions and connected training data remain planned.
 
 ## Getting started
 
@@ -17,7 +17,7 @@ Before testing on your own hardware, read the [testing disclaimer](../DISCLAIMER
 
 ## Simple AprilTag tracking (Magic Leap 2)
 
-`Assets/Scripts/Tracking/TagTracker.cs` uses the Magic Leap OpenXR Marker Understanding API with **AprilTag 36H11** and the default detector profile. It requests marker tracking, spatial anchor, and spatial mapping permissions. `Assets/Scripts/Tracking/MarkerPlanePlacement.cs` uses each marker as a placement trigger, projects its horizontal position vertically onto a detected floor, and then creates a local spatial anchor for the running app. MarkerML2 was used as a read-only reference; persistent anchor storage, running logic, and BLE are outside this implementation.
+`Assets/Scripts/Tracking/TagTracker.cs` uses the Magic Leap OpenXR Marker Understanding API with **AprilTag 36H11** and the default detector profile. It requests marker tracking, spatial anchor, and spatial mapping permissions. `Assets/Scripts/Tracking/MarkerPlanePlacement.cs` uses each marker as a placement trigger, projects its horizontal position vertically onto a detected floor, and then creates a local spatial anchor for the running app. MarkerML2 was used as a read-only reference; persistent anchor storage and BLE are outside this implementation.
 
 1. Let Unity import and compile the script; check the Console for errors and warnings.
 2. In Android **XR Plug-in Management**, enable **OpenXR** and automatic XR initialization. In OpenXR settings, enable **Magic Leap 2 Support**, **Magic Leap 2 Marker Understanding**, and **Magic Leap 2 Spatial Anchor Subsystem**, and **Magic Leap 2 Planes Subsystem**; resolve relevant Project Validation issues. The SDK is already installed; no additional package upgrade is needed for this script.
@@ -75,3 +75,31 @@ Failures retain the phase and error, release owned resources, and leave the comp
 `Assets/Tests/Editor/TrackingTests.cs` contains EditMode regression tests in the `PaceScape.Tracking.EditorTests` assembly. Run that assembly through Unity's Test Runner. Tests cover floor projection, classification, boundaries, invalid device data, strict-mode distance behavior, initialization guards, capacity, cleanup, pause timing, session invalidation, anchor timeouts, and retained failures.
 
 These are device-independent checks; they do not emulate Magic Leap's native services. A release still requires a new device build and checks for permissions, pause/resume, session replacement, tracking loss/recovery, failed anchors, repeated enable/disable, stable placement, and sustained runtime performance. The earlier marker/floor position disagreement and X/Z accuracy remain target-device validation items; the floor projection is not an accuracy guarantee.
+
+## Marker-spawned running track
+
+`TagTracker.PopulateVisual` now creates an initially hidden content root containing both the marker object and `RunningTrackVisual`. The existing anchor tracking, pause/resume, failure, retry, and cleanup lifecycle controls the entire root. Each distinct marker ID gets its own object and oval once per local session; repeated observations do not duplicate placed content. No extra scene wiring or packages are needed.
+
+The track follows MarkerML2's `StadiumTrackGeometry` and `TreadmillOvalSetup`: two 84.39 m straights, 36.50 m inner radius, eight 1.22 m lanes, white boundaries, yellow edge ticks, a transverse entry line, and a direction arrow. The actual lane-one measurement-line circumference from those rounded dimensions is approximately 400.001 m. The marker lies on that measurement line, 0.30 m outside the inner boundary, at MarkerML2's nominal 390 m entry point (ten nominal metres before the bend). Anchor-local +Z follows the printed top edge projected onto the detected floor, as provided by `MarkerPlanePlacement`. The marker object is grounded separately before the track is added; its scale does not scale the oval. The object is centered on the selected lane (`Spawn Lane`, 1–8; default 1, with 0.31 m outward offset from the marker measurement line) and placed 0.50 m behind the start line, opposite to the initial running direction. `Distance Behind Start Line` on `TagTracker` changes this visual offset for newly placed markers; the floor anchor and track entry remain at the marker.
+
+Only the markings are drawn, leaving the real floor visible. The generated mesh sits 1 cm above the anchor's floor plane to limit z-fighting; it is a full-size oval, not a miniature. The entire oval is coplanar with that one detected surface and does not conform to terrain. A single marker does not establish surveyed alignment with a physical stadium. Legacy strict surface placement also aligns the oval to that selected surface; use floor mode for the running track.
+
+`Resources/PaceScapeTrack.shader` is bundled so runtime material creation also works in a device build, and includes URP stereo instancing support. All active track instances share one immutable mesh and one material. Reference-counted ownership releases both after the last track is removed, including content that was never visible; cleanup is idempotent. The unlit mesh needs no normals or retained CPU-side copy. Multiple distinct markers generate multiple full-size ovals; device memory and rendering cost still need measurement.
+
+Run the existing `PaceScape.Tracking.EditorTests` assembly, including `RunningTrackTests`, for entry alignment, closed lane edges, oval lengths, shared visibility, separate object grounding, and generated-resource cleanup. Editor rendering and compilation do not verify marker alignment on hardware. Build the updated app and check object/track coappearance, printed-top-edge heading, scale, floor height, tracking loss/recovery, pause/resume, and retry on Magic Leap 2.
+
+### Runner movement
+
+`TagTracker` exposes `Pace Minutes Per Kilometre` (default 6 = 6:00 min/km = 10 km/h), `Spawn Lane` (1–8), and `Distance Behind Start Line`. Pace changes affect existing objects immediately; lane and start offset apply to newly placed objects. Decimal pace values are decimal minutes (6.5 = 6:30), not minutes/seconds notation.
+
+`RunningTrackMotion` advances the object along the lane centerline and turns it into the tangent direction. Each lane uses its actual centerline radius and circumference, so physical speed stays constant through bends and outer lanes take longer to complete. The track and anchor stay fixed. Objects start moving automatically when their anchor is tracked and the content is visible. Tracking loss, recovery, and background time do not advance the runner; resuming retains the last position. Movement uses Unity's unscaled frame time, keeping the configured physical pace independent of timeScale. The first visible frame after tracking recovery does not advance the object. No treadmill input, animation, or race timing is added.
+
+## SDK anchor completion correction
+
+The Magic Leap SDK remains at version 2.6.0, now embedded through Unity Package Manager. Its local anchor completion path coalesces an initial add and a fast completion into one tracked addition, preventing AR Foundation's duplicate-action validation exception and the resulting anchor timeout seen on the device. See [the patch notes and device verification steps](magicleap-anchor-fix.md). `AnchorChangeTests` checks the original failure and both fast and delayed completion through the actual provider change batch and Unity validator. Hardware confirmation requires a new build.
+
+## Runtime hardening
+
+Startup rejects non-finite or nonpositive pace, lanes outside 1–8, non-finite or negative start offsets, inactive marker prefabs, and prefabs with ARAnchor or Rigidbody components. The tracker owns the anchor and movement. Existing runners hold position for invalid live pace values; constructors reject invalid start data before moving an object. One new marker placement is created per frame, bounded by the existing marker capacity. Content is hidden and movement paused unless the OpenXR head device reports both position and rotation tracked.
+
+The SDK patch also cancels pending anchor futures rather than trying to destroy a nonexistent native space. Session-ended removal clears managed anchors and pending/ready futures; unreported additions disappear without generating invalid same-batch removal events. Native cancellation results still require verification on hardware. See [production verification status](production-readiness.md) for completed and outstanding checks.
