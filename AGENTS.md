@@ -66,3 +66,7 @@ Style follows the [Unity C# style guide (Unity 6 edition)](https://unity.com/res
 
 - Small changes: 2 to 3 sentences covering what changed, which files, and what was not verified.
 - Larger changes: state what changed and which files; checks actually performed and their results; checks not performed (Unity compilation, tests, device verification); material assumptions, style deviations, and limitations; and whether a new device build is needed.
+
+## Live pace and gait adjustment
+
+The dashboard runner-panel speed slider converts km/h to pace and automatically submits edits through `runner.pace` after 500 ms, independent of lane/start configuration. Queued pace updates are dropped on disconnect. `RunningTrackMotion` begins walk/jog blending at 85% of imported walking speed and compensates playback rate to retain physical speed; intermediate walk/run blends may therefore use a rate below 1x. Editor and device gait verification remain required.

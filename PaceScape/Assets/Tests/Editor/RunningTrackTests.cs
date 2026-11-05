@@ -217,6 +217,18 @@ namespace PaceScape.Tests
                     Assert.That(animator.GetFloat("Speed") * animator.GetFloat("PlaybackRate"),
                         Is.EqualTo(1000f / (pace * 60f)).Within(0.03f));
                     Assert.That(hasAnimatedLeg, Is.True, "The runner must animate while following the lane.");
+                    if (pace == 12f)
+                    {
+                        bool hasEarlyJogContribution = false;
+                        foreach (AnimatorClipInfo clip in animator.GetCurrentAnimatorClipInfo(0))
+                        {
+                            hasEarlyJogContribution |= (clip.clip.name == "runninig" || clip.clip.name == "running") &&
+                                clip.weight > 0.001f;
+                        }
+
+                        Assert.That(hasEarlyJogContribution, Is.True, "Slow movement should already include a small jog blend.");
+                    }
+
                     float nativeSpeed = 0f;
                     foreach (AnimatorClipInfo clip in animator.GetCurrentAnimatorClipInfo(0))
                     {

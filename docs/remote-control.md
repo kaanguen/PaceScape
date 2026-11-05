@@ -114,3 +114,9 @@ A new installed device build is required. Verify initial connection, live pace, 
 5. Tracking stop/retry or detector/plane reconfiguration clears placements and returns the run to Ready. After reacquisition, another explicit start is required. Tracking/connection loss instead leaves a retained session Paused when anchors survive.
 
 The .NET transport, native readiness and these physical lifecycle effects still require a new Magic Leap device build. Browser simulation is not evidence of those behaviors.
+
+## Live speed slider
+
+The dashboard runner panel converts slider speed in km/h to pace and sends edits automatically after a 500 ms input pause using `runner.pace`. Only pace changes; draft lane/offset values are not submitted. A pending command is allowed to finish before the newest pace edit is sent. The confirmed target is displayed separately. Disconnects clear queued updates, and rejected/timed-out commands are not replayed.
+
+The avatar now begins mixing jogging at 85% of imported walking speed and reaches the original run clip at its native speed. Playback rate compensates for blended native velocity, preserving physical lane speed. This is a visual gait preference, not a training prescription or exact foot-contact guarantee. Unity compilation, gait tests and target-device naturalness checks remain pending.

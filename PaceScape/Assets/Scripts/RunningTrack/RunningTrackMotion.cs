@@ -9,6 +9,7 @@ namespace PaceScape.RunningTrack
         private static readonly int _speedParameter = Animator.StringToHash("Speed");
         private static readonly int _playbackRateParameter = Animator.StringToHash("PlaybackRate");
         private const double SpeedTransitionSeconds = 0.35;
+        private const float JogBlendStartFactor = 0.85f;
         private readonly Transform _target;
         private readonly Animator _animator;
         private int _lane;
@@ -18,6 +19,7 @@ namespace PaceScape.RunningTrack
         private bool _hasSpeedParameter;
         private bool _hasPlaybackRate;
         private float _walkSpeed;
+        private float _runSpeed;
         private float _sprintSpeed;
         private bool _hasAdvanced;
         private double _speed;
@@ -149,6 +151,10 @@ namespace PaceScape.RunningTrack
                         {
                             _walkSpeed = nativeSpeed;
                         }
+                        else if (clip.name == "runninig" || clip.name == "running")
+                        {
+                            _runSpeed = nativeSpeed;
+                        }
                         else if (clip.name == "sprint")
                         {
                             _sprintSpeed = nativeSpeed;
@@ -168,6 +174,14 @@ namespace PaceScape.RunningTrack
                 {
                     // Native root velocities calibrate cadence; only the track owns world displacement.
                     blendSpeed = Mathf.Clamp(speed, _walkSpeed, _sprintSpeed);
+                    if (_runSpeed > _walkSpeed && speed < _runSpeed)
+                    {
+                        // Introduce a small jog contribution earlier without changing path speed.
+                        float jogWeight = Mathf.InverseLerp(_walkSpeed * JogBlendStartFactor, _runSpeed, speed);
+                        blendSpeed = Mathf.Lerp(_walkSpeed, _runSpeed, jogWeight);
+                    }
+
+                    // Compensate for the blended clip's native velocity, including the early jog mixture.
                     playbackRate = speed / blendSpeed;
                 }
 
