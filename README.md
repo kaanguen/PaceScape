@@ -32,10 +32,10 @@
 
 **Die AR-Grundlage entsteht. Die Trainingsfunktionen folgen.**
 
-- **Implementiert:** Unity/OpenXR-Grundgerüst, AprilTag-36H11-Erkennung, Ebenenerkennung und lokale räumliche Anker zur gemeinsamen Platzierung von Markerobjekt und ovaler Laufstrecke mit acht Spuren; ein bewegter Würfel mit einstellbarer Pace (Standard 6:00 min/km) und Spurwahl.
+- **Implementiert:** Unity/OpenXR-Grundgerüst, AprilTag-36H11-Erkennung, Ebenenerkennung und lokale räumliche Anker zur gemeinsamen Platzierung von Markerobjekt und ovaler Laufstrecke mit acht Spuren; ein animierter Jogger mit vorhandener Starter-Assets-Laufanimation und einstellbarer Pace (Standard 6:00 min/km) und Spurwahl.
 - **In Prüfung:** Zuverlässige Erkennung und Platzierung auf der Magic Leap 2. Die vollständige Geräteprüfung steht noch aus.
 - **Neu implementiert, noch auf der Brille zu prüfen:** Lokaler WebSocket-Server mit Steuerungswebsite für Pace, Startposition und Tracking; Einrichtung siehe [Remote Control](docs/remote-control.md).
-- **Geplant:** Animierter Laufpartner und Live-Laufdaten.
+- **Geplant:** Live-Laufdaten.
 
 ## Server & Dashboard
 
@@ -71,5 +71,6 @@ Die aktualisierte App verbindet sich standardmäßig mit `ws://127.0.0.1:8787/ws
 <p align="center">
   <a href="docs/tracking-setup.md">Technische Dokumentation</a> &nbsp;·&nbsp;
   <a href="https://github.com/kaanguen/PaceScapeControll">Server-Repository</a> &nbsp;·&nbsp;
-  <a href="DISCLAIMER.md">Hinweise für Gerätetests</a>
+  <a href="DISCLAIMER.md">Hinweise für Gerätetests</a> &nbsp;·&nbsp;
+  <a href="THIRD-PARTY-NOTICES.md">Drittanbieter &amp; Lizenzhinweise</a>
 </p>

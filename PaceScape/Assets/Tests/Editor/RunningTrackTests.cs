@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 
 namespace PaceScape.Tests
@@ -156,7 +157,8 @@ namespace PaceScape.Tests
                 Vector3 afterSixPace = runner.transform.localPosition;
                 Assert.That(Vector3.Distance(initial, afterSixPace), Is.EqualTo(1000f / 360f).Within(0.0001f));
                 advance.Invoke(motion, new object[] { 1f, 5f });
-                Assert.That(Vector3.Distance(afterSixPace, runner.transform.localPosition), Is.EqualTo(1000f / 300f).Within(0.0001f));
+                Assert.That(Vector3.Distance(afterSixPace, runner.transform.localPosition),
+                    Is.GreaterThan(1000f / 360f).And.LessThan(1000f / 300f));
                 Vector3 beforePause = runner.transform.localPosition;
                 advance.Invoke(motion, new object[] { 0f, 6f });
                 advance.Invoke(motion, new object[] { 1f, 0f });
@@ -166,6 +168,134 @@ namespace PaceScape.Tests
             finally
             {
                 UnityEngine.Object.DestroyImmediate(runner);
+            }
+        }
+
+        [Test]
+        public void InitiallyHiddenJoggerFollowsLaneAndChangesAnimationWithLivePace()
+        {
+            var content = new GameObject("Hidden jogger test");
+            content.SetActive(false);
+            try
+            {
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Characters/Jogger/Jogger.prefab");
+                Assert.That(prefab, Is.Not.Null);
+                GameObject runner = UnityEngine.Object.Instantiate(prefab, content.transform);
+                Animator animator = runner.GetComponentInChildren<Animator>(true);
+                Type motionType = Type.GetType("PaceScape.RunningTrack.RunningTrackMotion, Assembly-CSharp", true);
+                object motion = Activator.CreateInstance(motionType, runner.transform, 3, 0.5f);
+                MethodInfo advance = motionType.GetMethod("Advance");
+
+                // Match marker placement: construct movement while hidden, then reveal the content.
+                content.SetActive(true);
+                animator.Rebind();
+                animator.Update(0f);
+
+                float previousPace = 12f;
+                foreach (float pace in new[] { 12f, 6f, 3f, 2f, 12f })
+                {
+                    double distance = 0;
+                    Vector3 previous = runner.transform.localPosition;
+                    Quaternion initialLegRotation = animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg).localRotation;
+                    bool hasAnimatedLeg = false;
+                    for (int frame = 0; frame < 120; frame++)
+                    {
+                        advance.Invoke(motion, new object[] { 1f / 60f, pace });
+                        animator.Update(1f / 60f);
+                        Vector3 current = runner.transform.localPosition;
+                        distance += Vector3.Distance(previous, current);
+                        Assert.That(Vector3.Dot((current - previous).normalized, runner.transform.forward), Is.GreaterThan(0.99f));
+                        previous = current;
+                        hasAnimatedLeg |= Quaternion.Angle(initialLegRotation,
+                            animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg).localRotation) > 5f;
+                    }
+
+                    double previousTravel = 2000.0 / (previousPace * 60.0);
+                    double targetTravel = 2000.0 / (pace * 60.0);
+                    Assert.That(distance, Is.InRange(Math.Min(previousTravel, targetTravel) - 0.01,
+                        Math.Max(previousTravel, targetTravel) + 0.01));
+                    Assert.That(animator.GetFloat("Speed") * animator.GetFloat("PlaybackRate"),
+                        Is.EqualTo(1000f / (pace * 60f)).Within(0.03f));
+                    Assert.That(hasAnimatedLeg, Is.True, "The runner must animate while following the lane.");
+                    float nativeSpeed = 0f;
+                    foreach (AnimatorClipInfo clip in animator.GetCurrentAnimatorClipInfo(0))
+                    {
+                        Assert.That(new[] { "walking", "runninig", "sprint" }, Does.Contain(clip.clip.name));
+                        nativeSpeed += new Vector2(clip.clip.averageSpeed.x, clip.clip.averageSpeed.z).magnitude * clip.weight;
+                    }
+
+                    Assert.That(nativeSpeed * animator.GetFloat("PlaybackRate"),
+                        Is.EqualTo(1000f / (pace * 60f)).Within(0.03f));
+                    previousPace = pace;
+                }
+
+                Assert.That(animator.applyRootMotion, Is.False);
+                Assert.That(animator.updateMode, Is.EqualTo(AnimatorUpdateMode.UnscaledTime));
+                Assert.That(animator.fireEvents, Is.False);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(content);
+            }
+        }
+
+        [Test]
+        public void SpeedTransitionsTravelTheSameDistanceAtDifferentFrameRates()
+        {
+            var slowerFrames = new GameObject("30 fps runner");
+            var fasterFrames = new GameObject("90 fps runner");
+            try
+            {
+                Type motionType = Type.GetType("PaceScape.RunningTrack.RunningTrackMotion, Assembly-CSharp", true);
+                MethodInfo advance = motionType.GetMethod("Advance");
+                object first = Activator.CreateInstance(motionType, slowerFrames.transform, 1, 0.5f);
+                object second = Activator.CreateInstance(motionType, fasterFrames.transform, 1, 0.5f);
+                advance.Invoke(first, new object[] { 0.1f, 6f });
+                advance.Invoke(second, new object[] { 0.1f, 6f });
+                for (int frame = 0; frame < 60; frame++)
+                {
+                    advance.Invoke(first, new object[] { 1f / 30f, 3f });
+                }
+
+                for (int frame = 0; frame < 180; frame++)
+                {
+                    advance.Invoke(second, new object[] { 1f / 90f, 3f });
+                }
+
+                Assert.That(Vector3.Distance(slowerFrames.transform.position, fasterFrames.transform.position), Is.LessThan(0.0001f));
+                Assert.That(Quaternion.Angle(slowerFrames.transform.rotation, fasterFrames.transform.rotation), Is.LessThan(0.01f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(slowerFrames);
+                UnityEngine.Object.DestroyImmediate(fasterFrames);
+            }
+        }
+
+        [Test]
+        public void HumanoidGroundingUsesSolesInsteadOfAnimationBounds()
+        {
+            var floor = new GameObject("Tilted floor");
+            floor.transform.SetPositionAndRotation(new Vector3(1f, 2f, 3f), Quaternion.Euler(8f, 25f, 0f));
+            floor.SetActive(false);
+            try
+            {
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Characters/Jogger/Jogger.prefab");
+                GameObject runner = UnityEngine.Object.Instantiate(prefab, floor.transform);
+                Type trackerType = Type.GetType("PaceScape.Tracking.TagTracker, Assembly-CSharp", true);
+                trackerType.GetMethod("PlaceVisualOnPlane", BindingFlags.NonPublic | BindingFlags.Static)
+                    .Invoke(null, new object[] { runner.transform, floor.transform });
+                Animator animator = runner.GetComponentInChildren<Animator>(true);
+                Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                float leftHeight = floor.transform.InverseTransformPoint(leftFoot.position).y - animator.leftFeetBottomHeight;
+                float rightHeight = floor.transform.InverseTransformPoint(rightFoot.position).y - animator.rightFeetBottomHeight;
+                Assert.That(Mathf.Min(leftHeight, rightHeight), Is.EqualTo(0f).Within(0.0001f));
+                Assert.That(animator.GetComponent("RunnerFootPlacement"), Is.Not.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(floor);
             }
         }
 

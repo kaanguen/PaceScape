@@ -1028,6 +1028,31 @@ namespace PaceScape.Tracking
 
         private static void PlaceVisualOnPlane(Transform visual, Transform anchor)
         {
+            Animator animator = visual.GetComponentInChildren<Animator>(true);
+            if (animator != null && animator.isHuman && animator.avatar != null && animator.avatar.isValid)
+            {
+                Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                if (leftFoot != null && rightFoot != null)
+                {
+                    // Skinned bounds include animation margins, not the actual standing soles.
+                    Vector3 leftSole = leftFoot.position - animator.transform.up *
+                        (animator.leftFeetBottomHeight * animator.transform.lossyScale.y);
+                    Vector3 rightSole = rightFoot.position - animator.transform.up *
+                        (animator.rightFeetBottomHeight * animator.transform.lossyScale.y);
+                    float soleHeight = Mathf.Min(anchor.InverseTransformPoint(leftSole).y,
+                        anchor.InverseTransformPoint(rightSole).y);
+                    visual.localPosition -= Vector3.up * soleHeight;
+                    RunnerFootPlacement footPlacement = animator.GetComponent<RunnerFootPlacement>();
+                    if (footPlacement != null)
+                    {
+                        footPlacement.Configure(anchor);
+                    }
+
+                    return;
+                }
+            }
+
             Renderer[] renderers = visual.GetComponentsInChildren<Renderer>(true);
             float nearestSurface = float.PositiveInfinity;
             foreach (Renderer renderer in renderers)
