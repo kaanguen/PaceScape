@@ -7,7 +7,8 @@ namespace PaceScape.RunningTrack
     public sealed class RunningTrackMotion
     {
         private readonly Transform _target;
-        private readonly int _lane;
+        private int _lane;
+        private float _distanceBehindStartLine;
         private readonly float _groundOffset;
         private double _distance;
 
@@ -36,9 +37,28 @@ namespace PaceScape.RunningTrack
             }
 
             _target = target;
-            _lane = lane;
             _groundOffset = target.localPosition.y;
-            _distance = -distanceBehindStartLine % RunningTrackGeometry.GetLaneLength(lane);
+            ConfigureStart(lane, distanceBehindStartLine);
+        }
+
+        /// <summary>Repositions on the requested lane at the start offset while preserving grounded height.</summary>
+        public void ConfigureStart(int lane, float distanceBehindStartLine)
+        {
+            if (lane < 1 || lane > RunningTrackGeometry.LaneCount || !IsFinite(distanceBehindStartLine) ||
+                distanceBehindStartLine < 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(distanceBehindStartLine));
+            }
+
+            _lane = lane;
+            _distanceBehindStartLine = distanceBehindStartLine;
+            ResetToStart();
+        }
+
+        /// <summary>Returns to the configured start without moving the anchor or track.</summary>
+        public void ResetToStart()
+        {
+            _distance = -_distanceBehindStartLine % RunningTrackGeometry.GetLaneLength(_lane);
             ApplyPose();
         }
 
