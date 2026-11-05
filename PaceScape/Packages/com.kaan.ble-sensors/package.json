@@ -1,0 +1,13 @@
+{
+  "name": "com.kaan.ble-sensors",
+  "version": "1.0.0",
+  "displayName": "BLE Sensors (Velorexe)",
+  "description": "Profile-driven BLE sensor integration with heart rate, temperature, pulse oximetry and Unity UI. Android backend requires the documented Velorexe revision.",
+  "unity": "2022.3",
+  "dependencies": {
+    "com.velorexe.androidbluetoothlowenergy": "0.0.6",
+    "com.unity.textmeshpro": "3.0.7",
+    "com.unity.ugui": "1.0.0",
+    "com.unity.modules.androidjni": "1.0.0"
+  }
+}

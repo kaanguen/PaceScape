@@ -1,5 +1,6 @@
 using System;
 using PaceScape.Tracking;
+using PaceScape.Treadmill;
 using UnityEngine;
 
 namespace PaceScape.RemoteControl
@@ -24,6 +25,7 @@ namespace PaceScape.RemoteControl
     internal sealed class RemotePayload
     {
         // Sentinels ensure omitted numeric members fail validation instead of silently becoming zero.
+        public string deviceId;
         public float paceMinutesPerKilometre = -1f;
         public int spawnLane = -1;
         public float distanceBehindStartLine = -1f;
@@ -40,6 +42,8 @@ namespace PaceScape.RemoteControl
     internal sealed class RemoteState
     {
         public string deviceName;
+        public int treadmillControlVersion;
+        public TreadmillState treadmill;
         public bool isEditor;
         public bool testScene;
         public int spawnControlVersion;
@@ -69,6 +73,33 @@ namespace PaceScape.RemoteControl
     /// <summary>Validates and dispatches supported commands on Unity's main thread.</summary>
     public static class RemoteControlCommands
     {
+        /// <summary>Applies BLE commands without routing them through marker or test-scene configuration.</summary>
+        public static bool TryApplyTreadmill(string json, TreadmillInput treadmill, out string error)
+        {
+            error = "A treadmill command ID, payload and active input are required.";
+            if (treadmill == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                RemoteMessage message = JsonUtility.FromJson<RemoteMessage>(json);
+                if (message == null || message.type != "command" || string.IsNullOrEmpty(message.commandId) ||
+                    message.payload == null)
+                {
+                    return false;
+                }
+
+                return treadmill.TryApply(message.commandType, message.payload.deviceId, out error);
+            }
+            catch (Exception exception)
+            {
+                error = $"Treadmill command failed ({exception.GetType().Name}).";
+                return false;
+            }
+        }
+
         /// <summary>Applies the same wire commands to the marker-free scene target.</summary>
         public static bool TryApplyTestScene(string json, ServerTestScene scene, out string error)
         {

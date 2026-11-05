@@ -6,6 +6,7 @@ using MagicLeap.OpenXR.Features.MarkerUnderstanding;
 using MagicLeap.OpenXR.Features.Planes;
 using MagicLeap.OpenXR.Features.SpatialAnchors;
 using PaceScape.RunningTrack;
+using PaceScape.Treadmill;
 using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.XR;
@@ -99,6 +100,12 @@ namespace PaceScape.Tracking
         /// <summary>Gets the number of marker poses awaiting a matching plane.</summary>
         public int PendingMarkerCount => _pendingMarkers.Count;
 
+        /// <summary>Gets or assigns the optional source of live belt speed.</summary>
+        public TreadmillInput TreadmillSource { get; set; }
+
+        private bool HasRequiredTreadmillSignal => TreadmillSource == null ||
+            !TreadmillSource.FollowTreadmill || TreadmillSource.TryGetSpeedKmh(out _);
+
         /// <summary>Updates the target pace of existing and future objects after validation.</summary>
         public bool TrySetPace(float paceMinutesPerKilometre)
         {
@@ -135,7 +142,7 @@ namespace PaceScape.Tracking
         }
 
         /// <summary>Reports whether the foreground tracking session can start or resume all placed objects.</summary>
-        public bool CanRun => isActiveAndEnabled && IsForeground && _hasHeadTracking &&
+        public bool CanRun => isActiveAndEnabled && IsForeground && _hasHeadTracking && HasRequiredTreadmillSignal &&
             _startupPhase == StartupPhase.Ready && _markers.Count > 0 && RunnableMarkerCount == _markers.Count;
 
         /// <summary>Applies pace, lane and offset together; positional changes require a reset waiting session.</summary>
@@ -781,6 +788,15 @@ namespace PaceScape.Tracking
 
         private bool UpdateVisuals()
         {
+            if (!HasRequiredTreadmillSignal)
+            {
+                _runSession.TryPause();
+            }
+
+            float effectivePace = TreadmillSource != null
+                ? TreadmillSource.GetRunnerPace(_paceMinutesPerKilometre)
+                : _paceMinutesPerKilometre;
+
             // Check every anchor before advancing any runner; tracking loss pauses the entire session.
             foreach (MarkerVisual marker in _markers.Values)
             {
@@ -815,7 +831,11 @@ namespace PaceScape.Tracking
 
                 if (isTracked && wasVisible)
                 {
-                    _runSession.Advance(marker.Motion, Time.unscaledDeltaTime, _paceMinutesPerKilometre);
+                    if (!HasRequiredTreadmillSignal)
+                    {
+                        marker.Motion?.Advance(Time.unscaledDeltaTime, 0f);
+                    }
+                    _runSession.Advance(marker.Motion, Time.unscaledDeltaTime, effectivePace);
                 }
             }
 
