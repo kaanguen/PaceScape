@@ -60,6 +60,7 @@ namespace PaceScape.RemoteControl
         public int pendingMarkers;
         public int runnerControlVersion;
         public int runnerModeControlVersion;
+        public int ghostControlVersion;
         public string runnerMode;
         public int comparisonControlVersion;
         public PerformanceState performance;
@@ -180,7 +181,7 @@ namespace PaceScape.RemoteControl
                     {
                         return true;
                     }
-                    error = "Runner mode must be FollowInput, TempoRunner or AllTimePersonalBest.";
+                    error = "Ghost reference must be FixedPace or AllTimePersonalBest.";
                     return false;
                 case "runner.configure":
                     if (tracker.TryConfigureRunner(payload.paceMinutesPerKilometre, payload.spawnLane,

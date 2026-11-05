@@ -7,7 +7,6 @@ using MagicLeap.OpenXR.Features.Planes;
 using MagicLeap.OpenXR.Features.SpatialAnchors;
 using PaceScape.Performance;
 using PaceScape.RunningTrack;
-using PaceScape.Treadmill;
 using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.XR;
@@ -101,16 +100,13 @@ namespace PaceScape.Tracking
         /// <summary>Gets the number of marker poses awaiting a matching plane.</summary>
         public int PendingMarkerCount => _pendingMarkers.Count;
 
-        /// <summary>Gets or assigns the optional source of live belt speed.</summary>
-        public TreadmillInput TreadmillSource { get; set; }
-
         /// <summary>Gets the selected avatar speed mode, independently of the BLE connection.</summary>
         public RunningSession.RunnerMode Mode => _runSession.Mode;
 
-        /// <summary>Gets the target pace currently used for motion; zero denotes stopped or missing belt input.</summary>
-        public float ActivePaceMinutesPerKilometre => Mode != RunningSession.RunnerMode.FollowInput
-            ? PerformanceSource != null ? PerformanceSource.GetTargetPace(Mode, _paceMinutesPerKilometre) : _paceMinutesPerKilometre
-            : TreadmillSource != null ? TreadmillSource.GetRunnerPace(_paceMinutesPerKilometre) : _paceMinutesPerKilometre;
+        /// <summary>Gets the ghost reference pace, independent of live belt speed and current-run bests.</summary>
+        public float ActivePaceMinutesPerKilometre => PerformanceSource != null
+            ? PerformanceSource.GetTargetPace(Mode, _paceMinutesPerKilometre)
+            : _paceMinutesPerKilometre;
 
         /// <summary>Gets or assigns the separate belt-measurement and record owner.</summary>
         public RunnerPerformance PerformanceSource { get; set; }
@@ -120,9 +116,6 @@ namespace PaceScape.Tracking
         {
             return _runSession.TrySetMode(mode);
         }
-
-        private bool HasRequiredTreadmillSignal => Mode != RunningSession.RunnerMode.FollowInput ||
-            TreadmillSource == null || !TreadmillSource.FollowTreadmill || TreadmillSource.TryGetSpeedKmh(out _);
 
         /// <summary>Updates the target pace of existing and future objects after validation.</summary>
         public bool TrySetPace(float paceMinutesPerKilometre)
@@ -160,7 +153,7 @@ namespace PaceScape.Tracking
         }
 
         /// <summary>Reports whether the foreground tracking session can start or resume all placed objects.</summary>
-        public bool CanRun => isActiveAndEnabled && IsForeground && _hasHeadTracking && HasRequiredTreadmillSignal &&
+        public bool CanRun => isActiveAndEnabled && IsForeground && _hasHeadTracking &&
             _startupPhase == StartupPhase.Ready && _markers.Count > 0 && RunnableMarkerCount == _markers.Count;
 
         /// <summary>Applies pace, lane and offset together; positional changes require a reset waiting session.</summary>
@@ -807,11 +800,6 @@ namespace PaceScape.Tracking
 
         private bool UpdateVisuals()
         {
-            if (!HasRequiredTreadmillSignal)
-            {
-                _runSession.TryPause();
-            }
-
             float effectivePace = ActivePaceMinutesPerKilometre;
 
             // Check every anchor before advancing any runner; tracking loss pauses the entire session.
@@ -848,10 +836,6 @@ namespace PaceScape.Tracking
 
                 if (isTracked && wasVisible)
                 {
-                    if (!HasRequiredTreadmillSignal)
-                    {
-                        marker.Motion?.Advance(Time.unscaledDeltaTime, 0f);
-                    }
                     _runSession.Advance(marker.Motion, Time.unscaledDeltaTime, effectivePace);
                 }
             }

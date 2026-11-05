@@ -11,16 +11,15 @@ namespace PaceScape.RunningTrack
             Paused
         }
 
-        /// <summary>Selects whether input speed or an independent target pace drives the avatar.</summary>
+        /// <summary>Selects the ghost's independent reference; user measurements never drive avatar speed directly.</summary>
         public enum RunnerMode
         {
-            FollowInput,
-            TempoRunner,
-            AllTimePersonalBest
+            FixedPace = 1,
+            AllTimePersonalBest = 2
         }
 
         /// <summary>Gets the selected speed mode; resets retain this operator setting.</summary>
-        public RunnerMode Mode { get; private set; } = RunnerMode.FollowInput;
+        public RunnerMode Mode { get; private set; } = RunnerMode.FixedPace;
 
         /// <summary>Changes mode atomically, pausing an active run without resetting its position.</summary>
         public bool TrySetMode(string mode)
@@ -28,11 +27,8 @@ namespace PaceScape.RunningTrack
             RunnerMode selected;
             switch (mode)
             {
-                case nameof(RunnerMode.FollowInput):
-                    selected = RunnerMode.FollowInput;
-                    break;
-                case nameof(RunnerMode.TempoRunner):
-                    selected = RunnerMode.TempoRunner;
+                case nameof(RunnerMode.FixedPace):
+                    selected = RunnerMode.FixedPace;
                     break;
                 case nameof(RunnerMode.AllTimePersonalBest):
                     selected = RunnerMode.AllTimePersonalBest;

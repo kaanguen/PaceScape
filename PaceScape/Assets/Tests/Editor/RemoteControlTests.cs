@@ -119,21 +119,21 @@ namespace PaceScape.Tests
         [Test]
         public void RunnerModeCommandIsStrictAndAlsoSupportedByTheMarkerFreePreview()
         {
-            Assert.That(Apply("runner.mode", "{\"runnerMode\":\"TempoRunner\"}"), Is.True);
-            Assert.That(Property(_tracker, "Mode").ToString(), Is.EqualTo("TempoRunner"));
+            Assert.That(Apply("runner.mode", "{\"runnerMode\":\"FixedPace\"}"), Is.True);
+            Assert.That(Property(_tracker, "Mode").ToString(), Is.EqualTo("FixedPace"));
             Assert.That(Apply("runner.mode", "{}"), Is.False);
             Assert.That(Apply("runner.mode", "{\"runnerMode\":\"GhostRunner\"}"), Is.False);
-            Assert.That(Property(_tracker, "Mode").ToString(), Is.EqualTo("TempoRunner"));
-            Assert.That(Apply("runner.mode", "{\"runnerMode\":\"FollowInput\"}"), Is.True);
+            Assert.That(Property(_tracker, "Mode").ToString(), Is.EqualTo("FixedPace"));
+            Assert.That(Apply("runner.mode", "{\"runnerMode\":\"FixedPace\"}"), Is.True);
             Component preview = _root.AddComponent(RuntimeType("RemoteControl.ServerTestScene"));
             object[] arguments =
             {
-                "{\"type\":\"command\",\"commandId\":\"mode\",\"commandType\":\"runner.mode\",\"payload\":{\"runnerMode\":\"TempoRunner\"}}",
+                "{\"type\":\"command\",\"commandId\":\"mode\",\"commandType\":\"runner.mode\",\"payload\":{\"runnerMode\":\"FixedPace\"}}",
                 preview,
                 null
             };
             Assert.That(_commands.GetMethod("TryApplyTestScene").Invoke(null, arguments), Is.True);
-            Assert.That(Property(preview, "Mode").ToString(), Is.EqualTo("TempoRunner"));
+            Assert.That(Property(preview, "Mode").ToString(), Is.EqualTo("FixedPace"));
         }
 
         [Test]

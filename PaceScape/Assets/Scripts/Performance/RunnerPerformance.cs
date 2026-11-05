@@ -92,8 +92,7 @@ namespace PaceScape.Performance
         /// <summary>Resolves constant average pace; a real slower first result still replaces target/demo fallback.</summary>
         public float GetTargetPace(RunningSession.RunnerMode mode, float fallback)
         {
-            double seconds = mode == RunningSession.RunnerMode.TempoRunner ? _efforts.BestSeconds :
-                mode == RunningSession.RunnerMode.AllTimePersonalBest ? AllTimeSeconds : 0;
+            double seconds = mode == RunningSession.RunnerMode.AllTimePersonalBest ? AllTimeSeconds : 0;
             return seconds > 0 ? (float)(seconds * 1000 / ComparisonDistanceMetres / 60) : fallback;
         }
 

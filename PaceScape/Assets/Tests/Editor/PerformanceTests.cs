@@ -137,20 +137,20 @@ namespace PaceScape.Tests
         }
 
         [Test]
-        public void CurrentRunGhostUsesFirstCompleteResultEvenWhenSlowerThanTarget()
+        public void FixedGhostIgnoresCurrentRunBestAndKeepsItsPreset()
         {
             var root = new GameObject("Session ghost target test");
             Component performance = root.AddComponent(RuntimeType("RunnerPerformance"));
             try
             {
                 Type mode = Type.GetType("PaceScape.RunningTrack.RunningSession+RunnerMode, Assembly-CSharp", true);
-                object selected = Enum.Parse(mode, "TempoRunner");
+                object selected = Enum.Parse(mode, "FixedPace");
                 Assert.That(Call(performance, "GetTargetPace", selected, 4f), Is.EqualTo(4f));
                 object efforts = performance.GetType().GetField("_efforts", PrivateInstance).GetValue(performance);
                 Call(efforts, "Advance", 200.0, 7.2);
-                Assert.That(Call(performance, "GetTargetPace", selected, 4f), Is.EqualTo(200f * 1000f / 400f / 60f).Within(0.00001f));
+                Assert.That(Call(performance, "GetTargetPace", selected, 4f), Is.EqualTo(4f));
                 Call(efforts, "Advance", 100.0, 14.4);
-                Assert.That(Call(performance, "GetTargetPace", selected, 4f), Is.EqualTo(100f * 1000f / 400f / 60f).Within(0.00001f));
+                Assert.That(Call(performance, "GetTargetPace", selected, 4f), Is.EqualTo(4f));
                 Call(performance, "ResetSession");
                 Assert.That(Call(performance, "GetTargetPace", selected, 4f), Is.EqualTo(4f));
             }

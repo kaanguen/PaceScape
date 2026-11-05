@@ -244,6 +244,7 @@ namespace PaceScape.RemoteControl
                 startupError = string.Empty,
                 runnerControlVersion = 1,
                 runnerModeControlVersion = 1,
+                ghostControlVersion = 1,
                 runnerMode = _session.Mode.ToString(),
                 activeRunnerPace = PerformanceSource != null ? PerformanceSource.GetTargetPace(_session.Mode, _pace) : _pace,
                 runState = _session.State.ToString(),
