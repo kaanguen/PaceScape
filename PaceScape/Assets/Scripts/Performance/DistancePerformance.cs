@@ -1,0 +1,137 @@
+using System;
+using System.Collections.Generic;
+
+namespace PaceScape.Performance
+{
+    /// <summary>Measures complete fixed-distance efforts from belt samples, independently of avatar motion.</summary>
+    public sealed class DistancePerformance
+    {
+        private readonly List<LapResult> _history = new List<LapResult>();
+        private double _lapStartedAt;
+        private double _lapDistance;
+        private bool _isLapValid = true;
+
+        /// <summary>Gets the selected measurement distance in metres.</summary>
+        public double DistanceMetres { get; private set; } = 400;
+        /// <summary>Gets total measured distance in this session.</summary>
+        public double TotalDistanceMetres { get; private set; }
+        /// <summary>Gets elapsed measured session time, including stopped belts.</summary>
+        public double ElapsedSeconds { get; private set; }
+        /// <summary>Gets the number of completed distance blocks, including invalid blocks.</summary>
+        public int CompletedLaps { get; private set; }
+        /// <summary>Gets progress within the current distance block.</summary>
+        public double LapDistanceMetres => _lapDistance;
+        /// <summary>Gets elapsed time within the current distance block.</summary>
+        public double LapSeconds => ElapsedSeconds - _lapStartedAt;
+        /// <summary>Gets whether the current block contains no measurement gaps.</summary>
+        public bool IsLapValid => _isLapValid;
+        /// <summary>Gets the last valid completed effort time, or zero before a result.</summary>
+        public double LastLapSeconds { get; private set; }
+        /// <summary>Gets the fastest valid completed effort this session, or zero before a result.</summary>
+        public double BestSeconds { get; private set; }
+        /// <summary>Raised only for a fully measured distance block, including slower efforts.</summary>
+        public event Action<double, double> EffortCompleted;
+
+        /// <summary>Resets session measurements while selecting a new distance.</summary>
+        public bool TryReset(double distanceMetres)
+        {
+            // This is an engineering input bound, not a prescribed training distance.
+            if (!IsFinite(distanceMetres) || distanceMetres < 1 || distanceMetres > 1000000)
+            {
+                return false;
+            }
+            DistanceMetres = distanceMetres;
+            TotalDistanceMetres = 0;
+            ElapsedSeconds = 0;
+            _lapDistance = 0;
+            _lapStartedAt = 0;
+            CompletedLaps = 0;
+            _history.Clear();
+            LastLapSeconds = 0;
+            BestSeconds = 0;
+            _isLapValid = true;
+            return true;
+        }
+
+        /// <summary>Marks an unknown interval; a partially measured block cannot become a record.</summary>
+        public void Interrupt()
+        {
+            if (_lapDistance > 0 || LapSeconds > 0)
+            {
+                _isLapValid = false;
+            }
+        }
+
+        /// <summary>Integrates one known constant-speed interval, interpolating exact distance boundaries.</summary>
+        public void Advance(double seconds, double speedKmh)
+        {
+            if (!IsFinite(seconds) || seconds <= 0 || !IsFinite(speedKmh) || speedKmh < 0)
+            {
+                Interrupt();
+                return;
+            }
+            double speed = speedKmh / 3.6;
+            double remainingSeconds = seconds;
+            while (remainingSeconds > 0)
+            {
+                double untilBoundary = speed > 0 ? (DistanceMetres - _lapDistance) / speed : double.PositiveInfinity;
+                double step = Math.Min(remainingSeconds, untilBoundary);
+                _lapDistance += speed * step;
+                TotalDistanceMetres += speed * step;
+                ElapsedSeconds += step;
+                remainingSeconds -= step;
+                if (untilBoundary > step)
+                {
+                    break;
+                }
+                double lapSeconds = LapSeconds;
+                CompletedLaps++;
+                if (_history.Count == 100)
+                {
+                    _history.RemoveAt(0);
+                }
+                _history.Add(new LapResult
+                {
+                    number = CompletedLaps,
+                    seconds = lapSeconds,
+                    averageSpeedKmh = _isLapValid && lapSeconds > 0 ? DistanceMetres / lapSeconds * 3.6 : 0,
+                    isValid = _isLapValid
+                });
+                if (_isLapValid && lapSeconds > 0)
+                {
+                    LastLapSeconds = lapSeconds;
+                    if (BestSeconds <= 0 || lapSeconds < BestSeconds)
+                    {
+                        BestSeconds = lapSeconds;
+                    }
+                    EffortCompleted?.Invoke(DistanceMetres, lapSeconds);
+                }
+                _lapDistance = 0;
+                _lapStartedAt = ElapsedSeconds;
+                _isLapValid = true;
+            }
+        }
+
+        /// <summary>Copies up to the latest 100 completed lap results for display.</summary>
+        public LapResult[] CopyHistory()
+        {
+            return _history.ToArray();
+        }
+
+        private static bool IsFinite(double number)
+        {
+            return !double.IsNaN(number) && !double.IsInfinity(number);
+        }
+    }
+
+    /// <summary>A completed distance block; invalid entries are display-only and never records.</summary>
+    [Serializable]
+    public sealed class LapResult
+    {
+        public int number;
+        public double seconds;
+        public double averageSpeedKmh;
+        public bool isValid;
+    }
+
+}

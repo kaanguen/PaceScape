@@ -11,6 +11,44 @@ namespace PaceScape.RunningTrack
             Paused
         }
 
+        /// <summary>Selects whether input speed or an independent target pace drives the avatar.</summary>
+        public enum RunnerMode
+        {
+            FollowInput,
+            TempoRunner,
+            AllTimePersonalBest
+        }
+
+        /// <summary>Gets the selected speed mode; resets retain this operator setting.</summary>
+        public RunnerMode Mode { get; private set; } = RunnerMode.FollowInput;
+
+        /// <summary>Changes mode atomically, pausing an active run without resetting its position.</summary>
+        public bool TrySetMode(string mode)
+        {
+            RunnerMode selected;
+            switch (mode)
+            {
+                case nameof(RunnerMode.FollowInput):
+                    selected = RunnerMode.FollowInput;
+                    break;
+                case nameof(RunnerMode.TempoRunner):
+                    selected = RunnerMode.TempoRunner;
+                    break;
+                case nameof(RunnerMode.AllTimePersonalBest):
+                    selected = RunnerMode.AllTimePersonalBest;
+                    break;
+                default:
+                    return false;
+            }
+
+            if (Mode != selected)
+            {
+                TryPause();
+                Mode = selected;
+            }
+            return true;
+        }
+
         /// <summary>Gets the current running state; new sessions wait for an explicit start.</summary>
         public RunState State { get; private set; } = RunState.Ready;
 

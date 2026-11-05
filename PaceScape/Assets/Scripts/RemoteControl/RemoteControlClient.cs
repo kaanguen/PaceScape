@@ -5,6 +5,8 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using PaceScape.Performance;
+using PaceScape.RunningTrack;
 using PaceScape.Tracking;
 using PaceScape.Treadmill;
 using UnityEngine;
@@ -54,6 +56,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
+        private RunnerPerformance _performance;
         private TreadmillInput _treadmill;
         private TagTracker _tracker;
         private ServerTestScene _testScene;
@@ -104,6 +107,16 @@ namespace PaceScape.RemoteControl
             {
                 _treadmill = gameObject.AddComponent<TreadmillInput>();
                 _tracker.TreadmillSource = _treadmill;
+            }
+            _performance = gameObject.AddComponent<RunnerPerformance>();
+            _performance.Bind(_tracker, _treadmill, _testScene);
+            if (_tracker != null)
+            {
+                _tracker.PerformanceSource = _performance;
+            }
+            if (_testScene != null)
+            {
+                _testScene.PerformanceSource = _performance;
             }
             LoadConnectionSettings();
         }
@@ -303,8 +316,9 @@ namespace PaceScape.RemoteControl
                     if (message != null && message.commandType != null &&
                         message.commandType.StartsWith("treadmill.", StringComparison.Ordinal))
                     {
-                        if (message.commandType == "treadmill.connect" || message.commandType == "treadmill.disconnect" ||
-                            message.commandType == "treadmill.manual")
+                        if ((_tracker == null || _tracker.Mode == RunningSession.RunnerMode.FollowInput) &&
+                            (message.commandType == "treadmill.connect" || message.commandType == "treadmill.disconnect" ||
+                            message.commandType == "treadmill.manual"))
                         {
                             PauseTarget();
                         }
@@ -351,7 +365,10 @@ namespace PaceScape.RemoteControl
         {
             if (_testScene != null)
             {
-                return JsonUtility.ToJson(new RemoteMessage { type = "state", state = _testScene.CaptureState() });
+                RemoteState preview = _testScene.CaptureState();
+                preview.comparisonControlVersion = 1;
+                preview.performance = _performance != null ? _performance.CaptureState() : null;
+                return JsonUtility.ToJson(new RemoteMessage { type = "state", state = preview });
             }
 
             return JsonUtility.ToJson(new RemoteMessage
@@ -370,6 +387,11 @@ namespace PaceScape.RemoteControl
                     placedMarkers = _tracker.PlacedMarkerCount,
                     pendingMarkers = _tracker.PendingMarkerCount,
                     runnerControlVersion = 1,
+                    runnerModeControlVersion = 1,
+                    runnerMode = _tracker.Mode.ToString(),
+                    comparisonControlVersion = 1,
+                    performance = _performance != null ? _performance.CaptureState() : null,
+                    activeRunnerPace = _tracker.ActivePaceMinutesPerKilometre,
                     runState = _tracker.RunState.ToString(),
                     runnableMarkers = _tracker.RunnableMarkerCount,
                     canRun = _tracker.CanRun,

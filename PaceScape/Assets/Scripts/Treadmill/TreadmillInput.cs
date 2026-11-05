@@ -14,6 +14,9 @@ namespace PaceScape.Treadmill
         /// <summary>Gets whether runner speed is owned by the treadmill, including while its signal is missing.</summary>
         public bool FollowTreadmill { get; private set; }
 
+        /// <summary>Raised when a disconnect or invalid notification breaks measurement continuity.</summary>
+        public event Action MeasurementInterrupted;
+
         private void Awake()
         {
             _profile = TreadmillProfileDefaults.Create();
@@ -21,6 +24,7 @@ namespace PaceScape.Treadmill
             _connection.profile = _profile;
             _measurements = gameObject.AddComponent<SensorMeasurements>();
             _measurements.bluetooth = _connection;
+            _measurements.TreadmillSignalLost += OnMeasurementInterrupted;
         }
 
         /// <summary>Reports a fresh speed without treating stopped belts as missing data.</summary>
@@ -121,8 +125,17 @@ namespace PaceScape.Treadmill
             _connection?.Disconnect();
         }
 
+        private void OnMeasurementInterrupted()
+        {
+            MeasurementInterrupted?.Invoke();
+        }
+
         private void OnDestroy()
         {
+            if (_measurements != null)
+            {
+                _measurements.TreadmillSignalLost -= OnMeasurementInterrupted;
+            }
             if (_profile != null)
             {
                 Destroy(_profile);

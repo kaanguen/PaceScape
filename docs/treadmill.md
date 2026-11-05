@@ -1,6 +1,6 @@
 # Domyos / FTMS treadmill input
 
-PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2ACD`) on Magic Leap 2 through the user's embedded `com.kaan.ble-sensors` package and its pinned Velorexe dependency. The treadmill's reported belt speed drives the virtual runner after an explicit run start. PaceScape does not write speed, incline, start or stop commands to the physical treadmill.
+PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2ACD`) on Magic Leap 2 through the user's embedded `com.kaan.ble-sensors` package and its pinned Velorexe dependency. In the default FollowInput mode, the treadmill's reported belt speed drives the virtual runner after an explicit run start. The optional [Tempo Runner](tempo-runner.md) instead uses its own target pace, independently of BLE speed and freshness. PaceScape does not write speed, incline, start or stop commands to the physical treadmill.
 
 ## Connect
 
@@ -11,6 +11,8 @@ PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2
 5. Wait for **Gemeldete Geschwindigkeit**, place and track the runner as usual, then choose **Lauf starten**. Changing speed on the physical treadmill updates the virtual runner. The existing 0.35 s speed response also adjusts animation. This is belt telemetry, not a measurement of the runner's actual body speed or stride.
 
 ## Stopping and interruptions
+
+The following belt-speed rules apply to `FollowInput`. In `TempoRunner`, the configured target remains active at zero or missing belt speed, and explicit BLE connection/source commands do not pause the avatar; the normal tracking, app-background and server-interruption rules still apply.
 
 - A fresh **0 km/h** sample stops movement and sets the animation to idle immediately. It does not change the explicit run state; new positive speed resumes movement if the run is still Running.
 - Speed must have arrived within the last **two seconds**, matching the source plugin's existing freshness policy. Missing, rejected, disconnected or stale speed pauses the virtual session. Distance-only packets do not renew speed freshness. A fresh packet never automatically resumes a paused session: use **Weiterlaufen** after tracking and speed have recovered.

@@ -116,6 +116,42 @@ namespace PaceScape.Tests
             Assert.That(Apply("tracking.retry", "{}"), Is.False);
         }
 
+        [Test]
+        public void RunnerModeCommandIsStrictAndAlsoSupportedByTheMarkerFreePreview()
+        {
+            Assert.That(Apply("runner.mode", "{\"runnerMode\":\"TempoRunner\"}"), Is.True);
+            Assert.That(Property(_tracker, "Mode").ToString(), Is.EqualTo("TempoRunner"));
+            Assert.That(Apply("runner.mode", "{}"), Is.False);
+            Assert.That(Apply("runner.mode", "{\"runnerMode\":\"GhostRunner\"}"), Is.False);
+            Assert.That(Property(_tracker, "Mode").ToString(), Is.EqualTo("TempoRunner"));
+            Assert.That(Apply("runner.mode", "{\"runnerMode\":\"FollowInput\"}"), Is.True);
+            Component preview = _root.AddComponent(RuntimeType("RemoteControl.ServerTestScene"));
+            object[] arguments =
+            {
+                "{\"type\":\"command\",\"commandId\":\"mode\",\"commandType\":\"runner.mode\",\"payload\":{\"runnerMode\":\"TempoRunner\"}}",
+                preview,
+                null
+            };
+            Assert.That(_commands.GetMethod("TryApplyTestScene").Invoke(null, arguments), Is.True);
+            Assert.That(Property(preview, "Mode").ToString(), Is.EqualTo("TempoRunner"));
+        }
+
+        [Test]
+        public void ComparisonCommandRequiresAnOwnerAndValidWholeDistance()
+        {
+            Assert.That(Apply("runner.comparison", "{\"comparisonDistanceMetres\":5000,\"useDemoRecords\":true}"), Is.False);
+            Component performance = _root.AddComponent(Type.GetType("PaceScape.Performance.RunnerPerformance, Assembly-CSharp", true));
+            _tracker.GetType().GetProperty("PerformanceSource").SetValue(_tracker, performance);
+            Assert.That(Apply("runner.comparison", "{\"comparisonDistanceMetres\":5000,\"useDemoRecords\":true}"), Is.True);
+            Assert.That(Property(performance, "ComparisonDistanceMetres"), Is.EqualTo(5000));
+            Assert.That(Apply("runner.comparison", "{}"), Is.False);
+            Assert.That(Apply("runner.comparison", "{\"comparisonDistanceMetres\":0}"), Is.False);
+            Assert.That(Apply("runner.comparison", "{\"comparisonDistanceMetres\":400.5}"), Is.False);
+            Assert.That(Property(performance, "ComparisonDistanceMetres"), Is.EqualTo(5000));
+            Assert.That(Apply("runner.mode", "{\"runnerMode\":\"AllTimePersonalBest\"}"), Is.True);
+            Assert.That(Property(_tracker, "Mode").ToString(), Is.EqualTo("AllTimePersonalBest"));
+        }
+
         private bool Apply(string command, string payload)
         {
             string json = "{\"type\":\"command\",\"commandId\":\"test\",\"commandType\":\"" + command + "\",\"payload\":" + payload + "}";

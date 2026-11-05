@@ -108,6 +108,37 @@ namespace PaceScape.Tests
         }
 
         [Test]
+        public void TempoRunnerKeepsItsOwnTargetThroughBeltSpeedChangesStopAndSignalLoss()
+        {
+            var trackerRoot = new GameObject("Independent tempo test");
+            trackerRoot.SetActive(false);
+            trackerRoot.transform.SetParent(_root.transform);
+            Component tracker = trackerRoot.AddComponent(RuntimeType("Tracking.TagTracker"));
+            Type type = tracker.GetType();
+            type.GetProperty("TreadmillSource").SetValue(tracker, _source);
+            Receive(new byte[] { 0, 0, 0xB0, 4 }); // 12 km/h belt, 10 km/h target
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(5f));
+            Assert.That(type.GetMethod("TrySetRunnerMode").Invoke(tracker, new object[] { "TempoRunner" }), Is.True);
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(6f));
+            object session = Field(tracker, "_runSession");
+            session.GetType().GetMethod("TryStart").Invoke(session, new object[] { true });
+            Receive(new byte[] { 0, 0, 0, 0 });
+            type.GetMethod("UpdateVisuals", PrivateInstance).Invoke(tracker, null);
+            Assert.That(type.GetProperty("RunState").GetValue(tracker).ToString(), Is.EqualTo("Running"));
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(6f));
+            SetField(_connection, "<Connected>k__BackingField", false);
+            type.GetMethod("UpdateVisuals", PrivateInstance).Invoke(tracker, null);
+            Assert.That(type.GetProperty("RunState").GetValue(tracker).ToString(), Is.EqualTo("Running"));
+            Assert.That(type.GetProperty("HasRequiredTreadmillSignal", PrivateInstance).GetValue(tracker), Is.True);
+            type.GetMethod("TrySetPace").Invoke(tracker, new object[] { 4f });
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(4f));
+            type.GetMethod("TrySetRunnerMode").Invoke(tracker, new object[] { "FollowInput" });
+            Assert.That(type.GetProperty("RunState").GetValue(tracker).ToString(), Is.EqualTo("Paused"));
+            Assert.That(type.GetProperty("HasRequiredTreadmillSignal", PrivateInstance).GetValue(tracker), Is.False);
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.Zero);
+        }
+
+        [Test]
         public void AverageSpeedPrecedesUint24DistanceAndTruncatedDistanceIsRejected()
         {
             MethodInfo read = BleType("FtmsTreadmillData").GetMethod("Read");

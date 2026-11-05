@@ -5,6 +5,7 @@ using MagicLeap.Android;
 using MagicLeap.OpenXR.Features.MarkerUnderstanding;
 using MagicLeap.OpenXR.Features.Planes;
 using MagicLeap.OpenXR.Features.SpatialAnchors;
+using PaceScape.Performance;
 using PaceScape.RunningTrack;
 using PaceScape.Treadmill;
 using Unity.XR.CoreUtils;
@@ -103,8 +104,25 @@ namespace PaceScape.Tracking
         /// <summary>Gets or assigns the optional source of live belt speed.</summary>
         public TreadmillInput TreadmillSource { get; set; }
 
-        private bool HasRequiredTreadmillSignal => TreadmillSource == null ||
-            !TreadmillSource.FollowTreadmill || TreadmillSource.TryGetSpeedKmh(out _);
+        /// <summary>Gets the selected avatar speed mode, independently of the BLE connection.</summary>
+        public RunningSession.RunnerMode Mode => _runSession.Mode;
+
+        /// <summary>Gets the target pace currently used for motion; zero denotes stopped or missing belt input.</summary>
+        public float ActivePaceMinutesPerKilometre => Mode != RunningSession.RunnerMode.FollowInput
+            ? PerformanceSource != null ? PerformanceSource.GetTargetPace(Mode, _paceMinutesPerKilometre) : _paceMinutesPerKilometre
+            : TreadmillSource != null ? TreadmillSource.GetRunnerPace(_paceMinutesPerKilometre) : _paceMinutesPerKilometre;
+
+        /// <summary>Gets or assigns the separate belt-measurement and record owner.</summary>
+        public RunnerPerformance PerformanceSource { get; set; }
+
+        /// <summary>Selects the runner mode and pauses a running session when the mode changes.</summary>
+        public bool TrySetRunnerMode(string mode)
+        {
+            return _runSession.TrySetMode(mode);
+        }
+
+        private bool HasRequiredTreadmillSignal => Mode != RunningSession.RunnerMode.FollowInput ||
+            TreadmillSource == null || !TreadmillSource.FollowTreadmill || TreadmillSource.TryGetSpeedKmh(out _);
 
         /// <summary>Updates the target pace of existing and future objects after validation.</summary>
         public bool TrySetPace(float paceMinutesPerKilometre)
@@ -210,6 +228,7 @@ namespace PaceScape.Tracking
         public void ResetRun()
         {
             _runSession.Reset();
+            PerformanceSource?.ResetSession();
             foreach (MarkerVisual marker in _markers.Values)
             {
                 marker.Motion?.ResetToStart();
@@ -793,9 +812,7 @@ namespace PaceScape.Tracking
                 _runSession.TryPause();
             }
 
-            float effectivePace = TreadmillSource != null
-                ? TreadmillSource.GetRunnerPace(_paceMinutesPerKilometre)
-                : _paceMinutesPerKilometre;
+            float effectivePace = ActivePaceMinutesPerKilometre;
 
             // Check every anchor before advancing any runner; tracking loss pauses the entire session.
             foreach (MarkerVisual marker in _markers.Values)
@@ -1166,6 +1183,7 @@ namespace PaceScape.Tracking
         private void ReleaseResources()
         {
             _runSession.Reset();
+            PerformanceSource?.ResetSession();
             _hasHeadTracking = false;
             _startupAttempt++;
             foreach (MarkerVisual marker in _markers.Values)

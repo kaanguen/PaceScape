@@ -1,4 +1,5 @@
 using System;
+using PaceScape.Performance;
 using PaceScape.Tracking;
 using PaceScape.Treadmill;
 using UnityEngine;
@@ -26,6 +27,9 @@ namespace PaceScape.RemoteControl
     {
         // Sentinels ensure omitted numeric members fail validation instead of silently becoming zero.
         public string deviceId;
+        public string runnerMode;
+        public float comparisonDistanceMetres = -1;
+        public bool useDemoRecords;
         public float paceMinutesPerKilometre = -1f;
         public int spawnLane = -1;
         public float distanceBehindStartLine = -1f;
@@ -55,6 +59,11 @@ namespace PaceScape.RemoteControl
         public int placedMarkers;
         public int pendingMarkers;
         public int runnerControlVersion;
+        public int runnerModeControlVersion;
+        public string runnerMode;
+        public int comparisonControlVersion;
+        public PerformanceState performance;
+        public float activeRunnerPace;
         public string runState;
         public int runnableMarkers;
         public bool canRun;
@@ -158,6 +167,21 @@ namespace PaceScape.RemoteControl
             RemotePayload payload = message.payload;
             switch (message.commandType)
             {
+                case "runner.comparison":
+                    if (tracker.PerformanceSource != null && tracker.PerformanceSource.TryConfigure(
+                        payload.comparisonDistanceMetres, payload.useDemoRecords))
+                    {
+                        return true;
+                    }
+                    error = "Reset before changing comparison distance; pause before changing demonstration settings. Use whole metres, 1–1000000.";
+                    return false;
+                case "runner.mode":
+                    if (tracker.TrySetRunnerMode(payload.runnerMode))
+                    {
+                        return true;
+                    }
+                    error = "Runner mode must be FollowInput, TempoRunner or AllTimePersonalBest.";
+                    return false;
                 case "runner.configure":
                     if (tracker.TryConfigureRunner(payload.paceMinutesPerKilometre, payload.spawnLane,
                         payload.distanceBehindStartLine))
