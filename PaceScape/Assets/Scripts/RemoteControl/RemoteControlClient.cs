@@ -54,6 +54,7 @@ namespace PaceScape.RemoteControl
         }
 
         private TagTracker _tracker;
+        private ServerTestScene _testScene;
         private MarkerPlanePlacement _placement;
         private ConnectionSettings _settings;
         private ConnectionSession _session;
@@ -70,8 +71,9 @@ namespace PaceScape.RemoteControl
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateForTrackingScene()
         {
+            ServerTestScene testScene = FindObjectOfType<ServerTestScene>();
             TagTracker tracker = FindObjectOfType<TagTracker>(true);
-            if (tracker == null || FindObjectOfType<RemoteControlClient>(true) != null)
+            if ((tracker == null && testScene == null) || FindObjectOfType<RemoteControlClient>(true) != null)
             {
                 return;
             }
@@ -79,6 +81,7 @@ namespace PaceScape.RemoteControl
             var root = new GameObject("PaceScape Remote Control");
             root.SetActive(false);
             var client = root.AddComponent<RemoteControlClient>();
+            client._testScene = testScene;
             client._tracker = tracker;
             client._placement = FindObjectOfType<MarkerPlanePlacement>(true);
             root.SetActive(true);
@@ -92,7 +95,7 @@ namespace PaceScape.RemoteControl
         /// <summary>Pauses movement, cancels the old socket and reloads project defaults before reconnecting.</summary>
         public void ReloadConnectionSettings()
         {
-            _tracker?.TryPauseRun();
+            PauseTarget();
             _session?.Stop();
             _reloadConnectionRequested = true;
         }
@@ -136,7 +139,7 @@ namespace PaceScape.RemoteControl
                     role = "headset",
                     token = _settings.AccessToken
                 });
-                _isConfigured = _tracker != null;
+                _isConfigured = _testScene != null || _tracker != null;
             }
             catch (Exception exception)
             {
@@ -160,14 +163,14 @@ namespace PaceScape.RemoteControl
                 _nextConnectAt = Time.unscaledTime;
             }
 
-            if (!_isConfigured || _isPaused || _tracker == null)
+            if (!_isConfigured || _isPaused || (_tracker == null && _testScene == null))
             {
                 return;
             }
 
             if (_session != null && _session.Task.IsCompleted)
             {
-                _tracker.TryPauseRun();
+                PauseTarget();
                 if (!string.IsNullOrEmpty(_session.Error))
                 {
                     Debug.LogWarning($"[RemoteControl] Connection ended ({_session.Error}); retrying in 3 seconds.", this);
@@ -242,14 +245,14 @@ namespace PaceScape.RemoteControl
 
             if (_session.IsConnected && Time.unscaledTime - _lastControlAt > 6f)
             {
-                _tracker.TryPauseRun();
+                PauseTarget();
                 _session.Stop();
                 return;
             }
 
             if (!_session.IsConnected)
             {
-                _tracker.TryPauseRun();
+                PauseTarget();
                 if (Time.unscaledTime - _connectionStartedAt > 10f)
                 {
                     _session.Stop();
@@ -281,7 +284,9 @@ namespace PaceScape.RemoteControl
                 }
                 else
                 {
-                    success = RemoteControlCommands.TryApply(incoming.Json, _tracker, _placement, out error);
+                    success = _testScene != null
+                        ? RemoteControlCommands.TryApplyTestScene(incoming.Json, _testScene, out error)
+                        : RemoteControlCommands.TryApply(incoming.Json, _tracker, _placement, out error);
                 }
             }
             catch (Exception exception)
@@ -301,8 +306,25 @@ namespace PaceScape.RemoteControl
             }));
         }
 
+        private void PauseTarget()
+        {
+            if (_testScene != null)
+            {
+                _testScene.PauseRun();
+            }
+            else
+            {
+                _tracker?.TryPauseRun();
+            }
+        }
+
         private string CreateStateJson()
         {
+            if (_testScene != null)
+            {
+                return JsonUtility.ToJson(new RemoteMessage { type = "state", state = _testScene.CaptureState() });
+            }
+
             return JsonUtility.ToJson(new RemoteMessage
             {
                 type = "state",
@@ -442,14 +464,14 @@ namespace PaceScape.RemoteControl
             _isPaused = isPaused;
             if (isPaused)
             {
-                _tracker?.TryPauseRun();
+                PauseTarget();
                 _session?.Stop();
             }
         }
 
         private void OnDisable()
         {
-            _tracker?.TryPauseRun();
+            PauseTarget();
             _session?.Stop();
         }
     }

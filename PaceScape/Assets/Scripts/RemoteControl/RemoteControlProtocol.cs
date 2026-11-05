@@ -41,6 +41,9 @@ namespace PaceScape.RemoteControl
     {
         public string deviceName;
         public bool isEditor;
+        public bool testScene;
+        public int spawnControlVersion;
+        public bool runnerSpawned;
         public bool trackingEnabled;
         public string phase;
         public string startupStatus;
@@ -66,6 +69,33 @@ namespace PaceScape.RemoteControl
     /// <summary>Validates and dispatches supported commands on Unity's main thread.</summary>
     public static class RemoteControlCommands
     {
+        /// <summary>Applies the same wire commands to the marker-free scene target.</summary>
+        public static bool TryApplyTestScene(string json, ServerTestScene scene, out string error)
+        {
+            error = "The test scene is unavailable or the command is malformed.";
+            if (scene == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                RemoteMessage message = JsonUtility.FromJson<RemoteMessage>(json);
+                if (message == null || message.type != "command" || string.IsNullOrEmpty(message.commandId) ||
+                    message.payload == null)
+                {
+                    return false;
+                }
+
+                return scene.TryApply(message, out error);
+            }
+            catch (Exception exception)
+            {
+                error = $"Test scene command failed ({exception.GetType().Name}).";
+                return false;
+            }
+        }
+
         /// <summary>Applies one JSON command; success means applied or startup requested, not device readiness.</summary>
         public static bool TryApply(string json, TagTracker tracker, MarkerPlanePlacement placement, out string error)
         {
