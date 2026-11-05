@@ -13,7 +13,9 @@
   <br><br>
   <a href="#die-idee">Die Idee</a> &nbsp;·&nbsp;
   <a href="#entwicklungsstand">Entwicklungsstand</a> &nbsp;·&nbsp;
-  <a href="docs/tracking-setup.md">Dokumentation</a>
+  <a href="#server--dashboard">Server &amp; Dashboard</a> &nbsp;·&nbsp;
+  <a href="docs/tracking-setup.md">Dokumentation</a> &nbsp;·&nbsp;
+  <a href="https://github.com/kaanguen/PaceScapeControll">Server-Repository</a>
 
 </div>
 
@@ -31,13 +33,45 @@
 
 **Die AR-Grundlage entsteht. Die Trainingsfunktionen folgen.**
 
-- **Implementiert:** Unity/OpenXR-Grundgerüst, AprilTag-36H11-Erkennung, Ebenenerkennung und lokale räumliche Anker zur gemeinsamen Platzierung von Markerobjekt und ovaler Laufstrecke mit acht Spuren; ein bewegter Würfel mit einstellbarer Pace (Standard 6:00 min/km) und Spurwahl.
+- **Implementiert:** Unity/OpenXR-Grundgerüst, AprilTag-36H11-Erkennung, Ebenenerkennung und lokale räumliche Anker zur gemeinsamen Platzierung von Markerobjekt und ovaler Laufstrecke mit acht Spuren; ein animierter Jogger mit vorhandener Starter-Assets-Laufanimation und einstellbarer Pace (Standard 6:00 min/km) und Spurwahl.
 - **In Prüfung:** Zuverlässige Erkennung und Platzierung auf der Magic Leap 2. Die vollständige Geräteprüfung steht noch aus.
-- **Geplant:** Animierter Laufpartner, Live-Laufdaten und Web-Dashboard.
+- **Neu implementiert, noch auf der Brille zu prüfen:** Lokaler WebSocket-Server mit Steuerungswebsite für Pace, Startposition und Tracking; Einrichtung siehe [Remote Control](docs/remote-control.md).
+- **Geplant:** Live-Laufdaten.
+
+## Server & Dashboard
+
+**[PaceScape Control](https://github.com/kaanguen/PaceScapeControll)** ist das separate Server-Projekt zur Steuerung der App. Das Dashboard läuft lokal am Rechner und verbindet sich über **WebSockets** mit PaceScape auf der Magic Leap 2.
+
+- **Pace:** Zieltempo live für bereits platzierte und neue Objekte einstellen.
+- **Läufer einstellen:** Pace, Spur 1–8 und Startabstand gemeinsam übernehmen. Wartende Läufer werden direkt an die eingestellte Startposition gesetzt.
+- **Lauf:** Der platzierte Läufer wartet auf „Lauf starten“. Pause hält seine Position; Weiterlaufen setzt den Lauf fort. Zurücksetzen beendet den Lauf und stellt die Startposition wieder her.
+- **Tracking:** Erkennung starten, stoppen oder neu platzieren sowie Marker- und Bodeneinstellungen anpassen.
+- **Status:** Trackingphase, platzierte und wartende Marker sowie App-Meldungen im Dark-Mode-Dashboard sehen.
+
+Im Server-Repository mit **Node.js 22 oder neuer** starten:
+
+```sh
+npm ci
+npm start
+```
+
+Danach **[localhost:8787](http://localhost:8787)** im Browser öffnen. Für die USB-Verbindung zur Brille bei verfügbarem ADB die Weiterleitung setzen:
+
+```sh
+adb reverse tcp:8787 tcp:8787
+```
+
+Die Erkennung startet mit der App; der platzierte Läufer bewegt sich erst nach dem Startbefehl im Dashboard. Die Pace bleibt im Lauf veränderbar; für eine andere Spur oder Startposition zuerst zurücksetzen. Tracking- oder Serververbindungsverlust pausiert einen laufenden Lauf; nach Wiederherstellung bewusst „Weiterlaufen“ wählen.
+
+**Serveradresse im Unity Editor ändern:** Menü **PaceScape → Serververbindung** öffnen, **Rechner-IP übernehmen** wählen oder die WebSocket-Adresse eintragen und anschließend **Im Projekt speichern** wählen. Der IP-Button ist für einen Server auf demselben Rechner; bei mehreren Adaptern das Netz der Brille auswählen. Im Play Mode übernimmt **Speichern & neu verbinden** die Änderung direkt; für die Brille ist ein neuer Build nötig. Eine vorhandene Verbindungsdatei auf der Brille hat Vorrang.
+
+Die aktualisierte App verbindet sich standardmäßig mit `ws://127.0.0.1:8787/ws`. Die vollständige USB-/WLAN-Einrichtung steht in der [Remote-Control-Anleitung](docs/remote-control.md). Ein neuer App-Build und die Prüfung auf der echten Brille sind noch erforderlich; Server und Dashboard wurden bislang mit einer gekennzeichneten Test-Brille geprüft. Live-Trainingsmessdaten sind noch nicht implementiert.
 
 ---
 
 <p align="center">
   <a href="docs/tracking-setup.md">Technische Dokumentation</a> &nbsp;·&nbsp;
-  <a href="DISCLAIMER.md">Hinweise für Gerätetests</a>
+  <a href="https://github.com/kaanguen/PaceScapeControll">Server-Repository</a> &nbsp;·&nbsp;
+  <a href="DISCLAIMER.md">Hinweise für Gerätetests</a> &nbsp;·&nbsp;
+  <a href="THIRD-PARTY-NOTICES.md">Drittanbieter &amp; Lizenzhinweise</a>
 </p>

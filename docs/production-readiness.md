@@ -30,3 +30,18 @@ Android verification build succeeded: 0 errors, 26 warnings, 206.6 seconds, Deve
 SDK limitation requiring explicit device review: the 2.6.0 provider's native local-anchor completion path does not implement continuous per-anchor pose-validity polling after creation. The new head-pose gate hides content on global tracking loss, but it does not independently prove that each anchor's SDK state is fresh. Check anchor refinement and tracking loss/recovery before declaring the app production ready; an upstream fix or a separately validated native polling change may be needed.
 
 The conceptual/scientific owner must define acceptable position/heading error and training evaluation criteria. No such acceptance numbers are chosen by this engineering pass.
+
+## Local remote control addition
+
+- Implemented: separate PaceScape Control HTTP/WebSocket server and dashboard in `/Users/kaan/Work/PaceScapeControl/`; auto-created scene client, main-thread command dispatcher, validated setting APIs, Android Internet/cleartext declarations and EditMode regression tests.
+- Server verification: 13 local server/simulator tests pass. JavaScript syntax checks pass. Browser simulation verifies unified settings, start, pause, changed pace, resume and reset; this is not device evidence.
+- Pending: Unity compilation and `PaceScape.Tracking.EditorTests` (including `RemoteControlTests` and `RunControlTests`); device build, USB forwarding, Android ClientWebSocket/IL2CPP behavior, LAN setup, lifecycle/reconnect, marker configuration restarts and the actual tracking/placement effects.
+- See [remote control](remote-control.md) for the setup, technical input limits and limitations.
+
+- Explicit run control is now implemented through `RunningSession`, tracker APIs and the dashboard. Confirm that no placed object advances before explicit start, pause/resume preserves position, reset preserves anchors, positional edits are blocked until Ready, all runners pause together on tracking loss, and disconnect/heartbeat loss cannot silently resume movement. These Unity/device checks remain pending.
+
+## Editor server connection tool
+
+Implemented: **PaceScape > Serververbindung** (UI Toolkit), validated project connection defaults saved as a Resources asset through Unity, explicit Play-mode reconnect that pauses a run, and retained device JSON overrides. Pending: Unity compilation, `RemoteControlSettingsTests`, window layout/persistence, switching between actual endpoints in Play mode, and a new device build using saved defaults. No compile, UI, network reconnect or device pass is claimed for this addition.
+
+The settings window also reads the Editor computer's local IPv4 interfaces on request, with a selector when multiple addresses exist. It does not discover a remote server or prove network reachability. Verify adapter choice, retained port and manual fallback in the Editor; no runtime server protocol change is required.

@@ -26,6 +26,36 @@ namespace PaceScape.Tracking
         [Tooltip("Minimum absolute dot product between marker and surface normals.")]
         private float _minimumNormalAlignment = 0.9f;
 
+        /// <summary>Gets whether placement uses classified floors rather than strict surface matching.</summary>
+        public bool PlaceOnFloor => _placeOnFloor;
+
+        /// <summary>Gets the plane query padding in metres.</summary>
+        public float QueryPadding => _queryPadding;
+
+        /// <summary>Gets the strict-mode maximum marker-to-surface distance in metres.</summary>
+        public float MaxMarkerPlaneDistance => _maxMarkerPlaneDistance;
+
+        /// <summary>Gets the strict-mode minimum absolute normal alignment.</summary>
+        public float MinimumNormalAlignment => _minimumNormalAlignment;
+
+        /// <summary>Updates plane settings; the caller must restart active tracking to rebuild the query.</summary>
+        public bool TryConfigure(bool placeOnFloor, float queryPadding, float maxMarkerPlaneDistance,
+            float minimumNormalAlignment)
+        {
+            if (!IsFinite(queryPadding) || queryPadding < 0.1f || queryPadding > 100f ||
+                !IsFinite(maxMarkerPlaneDistance) || maxMarkerPlaneDistance < 0.001f || maxMarkerPlaneDistance > 10f ||
+                !IsFinite(minimumNormalAlignment) || minimumNormalAlignment < 0f || minimumNormalAlignment > 1f)
+            {
+                return false;
+            }
+
+            _placeOnFloor = placeOnFloor;
+            _queryPadding = queryPadding;
+            _maxMarkerPlaneDistance = maxMarkerPlaneDistance;
+            _minimumNormalAlignment = minimumNormalAlignment;
+            return true;
+        }
+
         private XROrigin _xrOrigin;
         private Bounds _queryBounds;
         private float _nextDiagnosticTime;

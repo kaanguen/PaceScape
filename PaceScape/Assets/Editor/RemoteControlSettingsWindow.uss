@@ -1,0 +1,34 @@
+.connection-settings {
+    padding: 16px;
+}
+.connection-settings > ScrollView {
+    flex-grow: 1;
+}
+.connection-settings .heading {
+    font-size: 17px;
+    -unity-font-style: bold;
+    margin-bottom: 10px;
+}
+.connection-settings .description {
+    white-space: normal;
+    margin-top: 8px;
+    margin-bottom: 12px;
+}
+.connection-settings TextField,
+.connection-settings Toggle,
+.connection-settings DropdownField {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+.connection-settings .actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 6px;
+    margin-bottom: 14px;
+}
+.connection-settings .actions Button {
+    min-height: 30px;
+    flex-grow: 1;
+    margin-right: 6px;
+    margin-bottom: 6px;
+}

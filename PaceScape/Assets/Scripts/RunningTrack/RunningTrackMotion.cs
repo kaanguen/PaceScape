@@ -3,12 +3,26 @@ using UnityEngine;
 
 namespace PaceScape.RunningTrack
 {
-    /// <summary>Moves one grounded object at constant physical speed along its selected lane centerline.</summary>
+    /// <summary>Moves one grounded object along its lane, smoothing live speed changes with its animation.</summary>
     public sealed class RunningTrackMotion
     {
+        private static readonly int _speedParameter = Animator.StringToHash("Speed");
+        private static readonly int _playbackRateParameter = Animator.StringToHash("PlaybackRate");
+        private const double SpeedTransitionSeconds = 0.35;
+        private const float JogBlendStartFactor = 0.85f;
         private readonly Transform _target;
-        private readonly int _lane;
+        private readonly Animator _animator;
+        private int _lane;
+        private float _distanceBehindStartLine;
         private readonly float _groundOffset;
+        private bool _hasCheckedAnimationParameters;
+        private bool _hasSpeedParameter;
+        private bool _hasPlaybackRate;
+        private float _walkSpeed;
+        private float _runSpeed;
+        private float _sprintSpeed;
+        private bool _hasAdvanced;
+        private double _speed;
         private double _distance;
 
         /// <summary>Places the object behind the shared start line, preserving its grounded height and scale.</summary>
@@ -36,19 +50,45 @@ namespace PaceScape.RunningTrack
             }
 
             _target = target;
-            _lane = lane;
+            _animator = target.GetComponentInChildren<Animator>(true);
             _groundOffset = target.localPosition.y;
-            _distance = -distanceBehindStartLine % RunningTrackGeometry.GetLaneLength(lane);
+            ConfigureStart(lane, distanceBehindStartLine);
+        }
+
+        /// <summary>Repositions on the requested lane at the start offset while preserving grounded height.</summary>
+        public void ConfigureStart(int lane, float distanceBehindStartLine)
+        {
+            if (lane < 1 || lane > RunningTrackGeometry.LaneCount || !IsFinite(distanceBehindStartLine) ||
+                distanceBehindStartLine < 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(distanceBehindStartLine));
+            }
+
+            _lane = lane;
+            _distanceBehindStartLine = distanceBehindStartLine;
+            ResetToStart();
+        }
+
+        /// <summary>Returns to the configured start without moving the anchor or track.</summary>
+        public void ResetToStart()
+        {
+            _distance = -_distanceBehindStartLine % RunningTrackGeometry.GetLaneLength(_lane);
             ApplyPose();
         }
 
         /// <summary>Advances by elapsed visible time; invalid or nonpositive time and pace leave the object still.</summary>
         public void Advance(float deltaTime, float paceMinutesPerKilometre)
         {
-            if (float.IsNaN(deltaTime) || float.IsInfinity(deltaTime) || deltaTime <= 0f ||
-                float.IsNaN(paceMinutesPerKilometre) || float.IsInfinity(paceMinutesPerKilometre) ||
-                paceMinutesPerKilometre <= 0f)
+            if (!IsFinite(deltaTime) || deltaTime <= 0f)
             {
+                return;
+            }
+
+            if (!IsFinite(paceMinutesPerKilometre) || paceMinutesPerKilometre <= 0f)
+            {
+                _speed = 0;
+                _hasAdvanced = false;
+                UpdateAnimation(0f);
                 return;
             }
 
@@ -57,14 +97,100 @@ namespace PaceScape.RunningTrack
                 throw new InvalidOperationException("The runner object was removed.");
             }
 
-            double speed = 1000.0 / ((double)paceMinutesPerKilometre * 60.0);
-            _distance = (_distance + speed * deltaTime) % RunningTrackGeometry.GetLaneLength(_lane);
+            double targetSpeed = 1000.0 / ((double)paceMinutesPerKilometre * 60.0);
+            if (!_hasAdvanced)
+            {
+                _speed = targetSpeed;
+                _hasAdvanced = true;
+            }
+
+            // Integrate the speed response exactly so travel does not depend on the frame rate.
+            double decay = Math.Exp(-deltaTime / SpeedTransitionSeconds);
+            double difference = _speed - targetSpeed;
+            double travel = targetSpeed * deltaTime + difference * SpeedTransitionSeconds * (1.0 - decay);
+            _speed = targetSpeed + difference * decay;
+            UpdateAnimation((float)Math.Min(_speed, float.MaxValue));
+            _distance = (_distance + travel) % RunningTrackGeometry.GetLaneLength(_lane);
             ApplyPose();
         }
 
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private void UpdateAnimation(float speed)
+        {
+            if (_animator == null || !_animator.isActiveAndEnabled || !_animator.isInitialized)
+            {
+                return;
+            }
+
+            if (!_hasCheckedAnimationParameters)
+            {
+                // Marker content starts inactive, when Unity exposes no Animator parameters yet.
+                foreach (AnimatorControllerParameter parameter in _animator.parameters)
+                {
+                    if (parameter.nameHash == _speedParameter && parameter.type == AnimatorControllerParameterType.Float)
+                    {
+                        _hasSpeedParameter = true;
+                        // Starter Assets clips include footstep callbacks; this visual has no audio receiver.
+                        _animator.fireEvents = false;
+                    }
+
+                    _hasPlaybackRate |= parameter.nameHash == _playbackRateParameter &&
+                        parameter.type == AnimatorControllerParameterType.Float;
+                }
+
+                if (_hasPlaybackRate)
+                {
+                    foreach (AnimationClip clip in _animator.runtimeAnimatorController.animationClips)
+                    {
+                        float nativeSpeed = new Vector2(clip.averageSpeed.x, clip.averageSpeed.z).magnitude;
+                        if (clip.name == "walking")
+                        {
+                            _walkSpeed = nativeSpeed;
+                        }
+                        else if (clip.name == "runninig" || clip.name == "running")
+                        {
+                            _runSpeed = nativeSpeed;
+                        }
+                        else if (clip.name == "sprint")
+                        {
+                            _sprintSpeed = nativeSpeed;
+                        }
+                    }
+                }
+
+                _hasCheckedAnimationParameters = true;
+            }
+
+            if (_hasSpeedParameter)
+            {
+                // Match the unscaled movement clock without changing the configured physical pace.
+                float blendSpeed = speed;
+                float playbackRate = 1f;
+                if (_hasPlaybackRate && _walkSpeed > 0f && _sprintSpeed > _walkSpeed && speed > 0f)
+                {
+                    // Native root velocities calibrate cadence; only the track owns world displacement.
+                    blendSpeed = Mathf.Clamp(speed, _walkSpeed, _sprintSpeed);
+                    if (_runSpeed > _walkSpeed && speed < _runSpeed)
+                    {
+                        // Introduce a small jog contribution earlier without changing path speed.
+                        float jogWeight = Mathf.InverseLerp(_walkSpeed * JogBlendStartFactor, _runSpeed, speed);
+                        blendSpeed = Mathf.Lerp(_walkSpeed, _runSpeed, jogWeight);
+                    }
+
+                    // Compensate for the blended clip's native velocity, including the early jog mixture.
+                    playbackRate = speed / blendSpeed;
+                }
+
+                _animator.SetFloat(_speedParameter, blendSpeed);
+                if (_hasPlaybackRate)
+                {
+                    _animator.SetFloat(_playbackRateParameter, playbackRate);
+                }
+            }
         }
 
         private void ApplyPose()

@@ -45,10 +45,10 @@ namespace PaceScape.Tracking
         [SerializeField] private XROrigin _xrOrigin;
         [SerializeField] private GameObject _markerPrefab;
         [SerializeField, Min(0f)]
-        [Tooltip("Object distance behind the start line in meters, opposite to the running direction. Applies to newly placed markers.")]
+        [Tooltip("Object distance behind the start line in meters, opposite to the running direction. Can be changed for existing objects while waiting for a run.")]
         private float _distanceBehindStartLine = 0.5f;
         [SerializeField, Range(1, RunningTrackGeometry.LaneCount)]
-        [Tooltip("Lane for newly spawned objects; 1 is the innermost lane.")]
+        [Tooltip("Lane for waiting objects and new placements; 1 is the innermost lane.")]
         private int _spawnLane = 1;
         [SerializeField, Min(0.1f)]
         [Tooltip("Running pace in minutes per kilometre. 6 means 6:00 min/km (10 km/h). Changes also apply to existing runners.")]
@@ -75,6 +75,158 @@ namespace PaceScape.Tracking
         /// <summary>Gets the last failure, retained until the next startup attempt.</summary>
         public string StartupError => _startupError;
 
+        /// <summary>Gets the configured target pace in decimal minutes per kilometre.</summary>
+        public float PaceMinutesPerKilometre => _paceMinutesPerKilometre;
+
+        /// <summary>Gets the lane configured for this running session.</summary>
+        public int SpawnLane => _spawnLane;
+
+        /// <summary>Gets the configured start offset in metres.</summary>
+        public float DistanceBehindStartLine => _distanceBehindStartLine;
+
+        /// <summary>Gets the physical printed marker side length in metres.</summary>
+        public float MarkerLength => _markerLength;
+
+        /// <summary>Gets the active-time startup timeout in seconds.</summary>
+        public float StartupTimeoutSeconds => _startupTimeoutSeconds;
+
+        /// <summary>Gets the marker capacity for this session.</summary>
+        public int MaxTrackedMarkers => _maxTrackedMarkers;
+
+        /// <summary>Gets the number of placed local anchors, including temporarily untracked anchors.</summary>
+        public int PlacedMarkerCount => _markers.Count;
+
+        /// <summary>Gets the number of marker poses awaiting a matching plane.</summary>
+        public int PendingMarkerCount => _pendingMarkers.Count;
+
+        /// <summary>Updates the target pace of existing and future objects after validation.</summary>
+        public bool TrySetPace(float paceMinutesPerKilometre)
+        {
+            if (!IsPositiveFinite(paceMinutesPerKilometre) ||
+                paceMinutesPerKilometre < 0.1f || paceMinutesPerKilometre > 60f)
+            {
+                return false;
+            }
+
+            _paceMinutesPerKilometre = paceMinutesPerKilometre;
+            return true;
+        }
+
+        /// <summary>Gets the explicit running state shared by all placed objects.</summary>
+        public RunningSession.RunState RunState => _runSession.State;
+
+        /// <summary>Gets the number of visible objects with a tracked local anchor.</summary>
+        public int RunnableMarkerCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (MarkerVisual marker in _markers.Values)
+                {
+                    if (marker.Instance != null && marker.Instance.activeInHierarchy && marker.Anchor != null &&
+                        !marker.Anchor.pending && marker.Anchor.trackingState == TrackingState.Tracking)
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
+
+        /// <summary>Reports whether the foreground tracking session can start or resume all placed objects.</summary>
+        public bool CanRun => isActiveAndEnabled && IsForeground && _hasHeadTracking &&
+            _startupPhase == StartupPhase.Ready && _markers.Count > 0 && RunnableMarkerCount == _markers.Count;
+
+        /// <summary>Applies pace, lane and offset together; positional changes require a reset waiting session.</summary>
+        public bool TryConfigureRunner(float paceMinutesPerKilometre, int lane, float distanceBehindStartLine)
+        {
+            if (!IsPositiveFinite(paceMinutesPerKilometre) || paceMinutesPerKilometre < 0.1f ||
+                paceMinutesPerKilometre > 60f || lane < 1 || lane > RunningTrackGeometry.LaneCount ||
+                float.IsNaN(distanceBehindStartLine) || float.IsInfinity(distanceBehindStartLine) ||
+                distanceBehindStartLine < 0f || distanceBehindStartLine > 1000f)
+            {
+                return false;
+            }
+
+            bool changesPosition = lane != _spawnLane || distanceBehindStartLine != _distanceBehindStartLine;
+            if (changesPosition && _runSession.State != RunningSession.RunState.Ready)
+            {
+                return false;
+            }
+
+            if (changesPosition)
+            {
+                foreach (MarkerVisual marker in _markers.Values)
+                {
+                    marker.Motion?.ConfigureStart(lane, distanceBehindStartLine);
+                }
+            }
+
+            _paceMinutesPerKilometre = paceMinutesPerKilometre;
+            _spawnLane = lane;
+            _distanceBehindStartLine = distanceBehindStartLine;
+            return true;
+        }
+
+        /// <summary>Updates existing waiting objects and future placements; running or paused positional changes fail.</summary>
+        public bool TrySetSpawn(int lane, float distanceBehindStartLine)
+        {
+            return TryConfigureRunner(_paceMinutesPerKilometre, lane, distanceBehindStartLine);
+        }
+
+        /// <summary>Starts from the configured position only after all current placements are tracked.</summary>
+        public bool TryStartRun(float paceMinutesPerKilometre, int lane, float distanceBehindStartLine)
+        {
+            if (_runSession.State != RunningSession.RunState.Ready || !CanRun)
+            {
+                return false;
+            }
+
+            return TryConfigureRunner(paceMinutesPerKilometre, lane, distanceBehindStartLine) &&
+                _runSession.TryStart(CanRun);
+        }
+
+        /// <summary>Pauses movement while retaining positions, anchors and the selected settings.</summary>
+        public bool TryPauseRun()
+        {
+            return _runSession.TryPause();
+        }
+
+        /// <summary>Resumes a paused run only when all existing placements are tracked again.</summary>
+        public bool TryResumeRun()
+        {
+            return _runSession.TryResume(CanRun);
+        }
+
+        /// <summary>Stops movement and returns existing objects to their configured start positions.</summary>
+        public void ResetRun()
+        {
+            _runSession.Reset();
+            foreach (MarkerVisual marker in _markers.Values)
+            {
+                marker.Motion?.ResetToStart();
+            }
+        }
+
+        /// <summary>Updates detector settings; the caller must restart active tracking to apply them.</summary>
+        public bool TryConfigureTracking(float markerLength, float timeoutSeconds, int maxTrackedMarkers)
+        {
+            if (!IsPositiveFinite(markerLength) || markerLength < 0.001f || markerLength > 10f ||
+                !IsPositiveFinite(timeoutSeconds) || timeoutSeconds < 1f || timeoutSeconds > 300f ||
+                maxTrackedMarkers < 1 || maxTrackedMarkers > 64)
+            {
+                return false;
+            }
+
+            _markerLength = markerLength;
+            _startupTimeoutSeconds = timeoutSeconds;
+            _maxTrackedMarkers = maxTrackedMarkers;
+            return true;
+        }
+
+        private readonly RunningSession _runSession = new RunningSession();
+        private bool _hasHeadTracking;
         private readonly Dictionary<ulong, MarkerVisual> _markers = new Dictionary<ulong, MarkerVisual>();
         private readonly Dictionary<ulong, Pose> _pendingMarkers = new Dictionary<ulong, Pose>();
         private readonly List<ulong> _placedMarkerIds = new List<ulong>();
@@ -545,10 +697,12 @@ namespace PaceScape.Tracking
                 (headState & (InputTrackingState.Position | InputTrackingState.Rotation)) !=
                 (InputTrackingState.Position | InputTrackingState.Rotation))
             {
+                _hasHeadTracking = false;
                 HideVisuals();
                 return;
             }
 
+            _hasHeadTracking = true;
             if (!UpdateVisuals())
             {
                 return;
@@ -595,6 +749,12 @@ namespace PaceScape.Tracking
                 _planePlacement.UpdateMarkerQuery(pendingBounds);
             }
 
+            // New anchors join only while waiting, so a running session keeps a stable set of objects.
+            if (_runSession.State != RunningSession.RunState.Ready)
+            {
+                return;
+            }
+
             foreach (KeyValuePair<ulong, Pose> marker in _pendingMarkers)
             {
                 ulong markerId = marker.Key;
@@ -621,6 +781,16 @@ namespace PaceScape.Tracking
 
         private bool UpdateVisuals()
         {
+            // Check every anchor before advancing any runner; tracking loss pauses the entire session.
+            foreach (MarkerVisual marker in _markers.Values)
+            {
+                if (marker.Anchor == null || marker.Anchor.pending || marker.Anchor.trackingState != TrackingState.Tracking)
+                {
+                    _runSession.TryPause();
+                    break;
+                }
+            }
+
             foreach (MarkerVisual marker in _markers.Values)
             {
                 if (marker.Instance == null || marker.Anchor == null)
@@ -645,7 +815,7 @@ namespace PaceScape.Tracking
 
                 if (isTracked && wasVisible)
                 {
-                    marker.Motion?.Advance(Time.unscaledDeltaTime, _paceMinutesPerKilometre);
+                    _runSession.Advance(marker.Motion, Time.unscaledDeltaTime, _paceMinutesPerKilometre);
                 }
             }
 
@@ -726,6 +896,8 @@ namespace PaceScape.Tracking
 
         private void HideVisuals()
         {
+            _hasHeadTracking = false;
+            _runSession.TryPause();
             foreach (MarkerVisual marker in _markers.Values)
             {
                 if (marker.Instance != null && marker.Instance.activeSelf)
@@ -856,6 +1028,31 @@ namespace PaceScape.Tracking
 
         private static void PlaceVisualOnPlane(Transform visual, Transform anchor)
         {
+            Animator animator = visual.GetComponentInChildren<Animator>(true);
+            if (animator != null && animator.isHuman && animator.avatar != null && animator.avatar.isValid)
+            {
+                Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                if (leftFoot != null && rightFoot != null)
+                {
+                    // Skinned bounds include animation margins, not the actual standing soles.
+                    Vector3 leftSole = leftFoot.position - animator.transform.up *
+                        (animator.leftFeetBottomHeight * animator.transform.lossyScale.y);
+                    Vector3 rightSole = rightFoot.position - animator.transform.up *
+                        (animator.rightFeetBottomHeight * animator.transform.lossyScale.y);
+                    float soleHeight = Mathf.Min(anchor.InverseTransformPoint(leftSole).y,
+                        anchor.InverseTransformPoint(rightSole).y);
+                    visual.localPosition -= Vector3.up * soleHeight;
+                    RunnerFootPlacement footPlacement = animator.GetComponent<RunnerFootPlacement>();
+                    if (footPlacement != null)
+                    {
+                        footPlacement.Configure(anchor);
+                    }
+
+                    return;
+                }
+            }
+
             Renderer[] renderers = visual.GetComponentsInChildren<Renderer>(true);
             float nearestSurface = float.PositiveInfinity;
             foreach (Renderer renderer in renderers)
@@ -948,6 +1145,8 @@ namespace PaceScape.Tracking
 
         private void ReleaseResources()
         {
+            _runSession.Reset();
+            _hasHeadTracking = false;
             _startupAttempt++;
             foreach (MarkerVisual marker in _markers.Values)
             {
