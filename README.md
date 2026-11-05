@@ -36,7 +36,7 @@
 - **Implementiert:** Unity/OpenXR-Grundgerüst, AprilTag-36H11-Erkennung, Ebenenerkennung und lokale räumliche Anker zur gemeinsamen Platzierung von Markerobjekt und ovaler Laufstrecke mit acht Spuren; ein animierter Jogger mit vorhandener Starter-Assets-Laufanimation und einstellbarer Pace (Standard 6:00 min/km) und Spurwahl.
 - **In Prüfung:** Zuverlässige Erkennung und Platzierung auf der Magic Leap 2. Die vollständige Geräteprüfung steht noch aus.
 - **Neu implementiert, noch auf der Brille zu prüfen:** Lokaler WebSocket-Server mit Steuerungswebsite für Pace, Startposition und Tracking; Einrichtung siehe [Remote Control](docs/remote-control.md).
-- **Geplant:** Live-Laufdaten.
+- **Neu implementiert, noch zu prüfen:** Bluetooth-Anbindung für FTMS-Laufbänder: gemeldete Geschwindigkeit steuert den virtuellen Läufer; Suche und Geräteauswahl im Dashboard. [Einrichtung und Grenzen](docs/treadmill.md).
 
 ## Server & Dashboard
 
@@ -65,7 +65,7 @@ Die Erkennung startet mit der App; der platzierte Läufer bewegt sich erst nach 
 
 **Serveradresse im Unity Editor ändern:** Menü **PaceScape → Serververbindung** öffnen, **Rechner-IP übernehmen** wählen oder die WebSocket-Adresse eintragen und anschließend **Im Projekt speichern** wählen. Der IP-Button ist für einen Server auf demselben Rechner; bei mehreren Adaptern das Netz der Brille auswählen. Im Play Mode übernimmt **Speichern & neu verbinden** die Änderung direkt; für die Brille ist ein neuer Build nötig. Eine vorhandene Verbindungsdatei auf der Brille hat Vorrang.
 
-Die aktualisierte App verbindet sich standardmäßig mit `ws://127.0.0.1:8787/ws`. Die vollständige USB-/WLAN-Einrichtung steht in der [Remote-Control-Anleitung](docs/remote-control.md). Ein neuer App-Build und die Prüfung auf der echten Brille sind noch erforderlich; Server und Dashboard wurden bislang mit einer gekennzeichneten Test-Brille geprüft. Live-Trainingsmessdaten sind noch nicht implementiert.
+Die aktualisierte App verbindet sich standardmäßig mit `ws://127.0.0.1:8787/ws`. Die vollständige USB-/WLAN-Einrichtung steht in der [Remote-Control-Anleitung](docs/remote-control.md). Ein neuer App-Build und die Prüfung auf der echten Brille sind noch erforderlich; Server und Dashboard wurden bislang mit einer gekennzeichneten Test-Brille geprüft. FTMS-Laufbandgeschwindigkeit und optionale Gesamtdistanz sind implementiert, aber noch nicht am Gerät geprüft; siehe [Laufband-Anbindung](docs/treadmill.md).
 
 ---
 

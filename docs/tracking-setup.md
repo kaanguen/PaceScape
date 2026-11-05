@@ -2,7 +2,7 @@
 
 PaceScape is a Unity project for augmented reality running training. The planned app overlays a virtual running track and an animated running partner onto the real environment, with treadmill and stadium training, live running statistics, and control through a web dashboard.
 
-The project is in its initial setup stage. A simple Magic Leap 2 OpenXR AprilTag tracker is implemented; the tracking scene is configured; device verification is still required. The marker-spawned oval and animated Jogger with configurable live pace are implemented; connected training data remains planned.
+The project is in its initial setup stage. A simple Magic Leap 2 OpenXR AprilTag tracker is implemented; the tracking scene is configured; device verification is still required. The marker-spawned oval and animated Jogger with configurable live pace are implemented; read-only FTMS treadmill speed input is now implemented separately and requires Editor/device verification; see [treadmill setup](treadmill.md).
 
 ## Getting started
 
@@ -17,7 +17,7 @@ Before testing on your own hardware, read the [testing disclaimer](../DISCLAIMER
 
 ## Simple AprilTag tracking (Magic Leap 2)
 
-`Assets/Scripts/Tracking/TagTracker.cs` uses the Magic Leap OpenXR Marker Understanding API with **AprilTag 36H11** and the default detector profile. It requests marker tracking, spatial anchor, and spatial mapping permissions. `Assets/Scripts/Tracking/MarkerPlanePlacement.cs` uses each marker as a placement trigger, projects its horizontal position vertically onto a detected floor, and then creates a local spatial anchor for the running app. MarkerML2 was used as a read-only reference; persistent anchor storage and BLE are outside this implementation.
+`Assets/Scripts/Tracking/TagTracker.cs` uses the Magic Leap OpenXR Marker Understanding API with **AprilTag 36H11** and the default detector profile. It requests marker tracking, spatial anchor, and spatial mapping permissions. `Assets/Scripts/Tracking/MarkerPlanePlacement.cs` uses each marker as a placement trigger, projects its horizontal position vertically onto a detected floor, and then creates a local spatial anchor for the running app. MarkerML2 was used as a read-only reference; persistent anchor storage is outside this implementation. The separate [FTMS treadmill input](treadmill.md) supplies live belt speed.
 
 1. Let Unity import and compile the script; check the Console for errors and warnings.
 2. In Android **XR Plug-in Management**, enable **OpenXR** and automatic XR initialization. In OpenXR settings, enable **Magic Leap 2 Support**, **Magic Leap 2 Marker Understanding**, and **Magic Leap 2 Spatial Anchor Subsystem**, and **Magic Leap 2 Planes Subsystem**; resolve relevant Project Validation issues. The SDK is already installed; no additional package upgrade is needed for this script.
@@ -116,4 +116,4 @@ The SDK patch also cancels pending anchor futures rather than trying to destroy 
 
 ## Local WebSocket control
 
-The separate PaceScape Control dashboard now has a runtime client in `Assets/Scripts/RemoteControl/`. It exposes the explicit run start/pause/resume/reset, unified pace/lane/offset settings, tracker lifecycle and detector/plane configuration. See [remote control setup and verification](remote-control.md). The older RunningServer protocol and BLE remain unconfigured. A new device build is required; server tests and the simulator do not verify Unity or headset behavior.
+The separate PaceScape Control dashboard now has a runtime client in `Assets/Scripts/RemoteControl/`. It exposes the explicit run start/pause/resume/reset, unified pace/lane/offset settings, tracker lifecycle and detector/plane configuration. See [remote control setup and verification](remote-control.md). The older RunningServer protocol remains unconfigured. FTMS BLE input now follows treadmill speed through the user package; see [treadmill setup](treadmill.md). A new device build is required; server tests and the simulator do not verify Unity or headset behavior.

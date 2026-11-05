@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using PaceScape.Tracking;
+using PaceScape.Treadmill;
 using UnityEngine;
 
 namespace PaceScape.RemoteControl
@@ -53,6 +54,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
+        private TreadmillInput _treadmill;
         private TagTracker _tracker;
         private ServerTestScene _testScene;
         private MarkerPlanePlacement _placement;
@@ -87,8 +89,22 @@ namespace PaceScape.RemoteControl
             root.SetActive(true);
         }
 
+        private void OnEnable()
+        {
+            if (_treadmill != null)
+            {
+                _treadmill.enabled = true;
+            }
+        }
+
         private void Start()
         {
+            // Keep BLE ownership local to this scene and avoid serialized scene changes.
+            if (_tracker != null)
+            {
+                _treadmill = gameObject.AddComponent<TreadmillInput>();
+                _tracker.TreadmillSource = _treadmill;
+            }
             LoadConnectionSettings();
         }
 
@@ -284,9 +300,22 @@ namespace PaceScape.RemoteControl
                 }
                 else
                 {
-                    success = _testScene != null
-                        ? RemoteControlCommands.TryApplyTestScene(incoming.Json, _testScene, out error)
-                        : RemoteControlCommands.TryApply(incoming.Json, _tracker, _placement, out error);
+                    if (message != null && message.commandType != null &&
+                        message.commandType.StartsWith("treadmill.", StringComparison.Ordinal))
+                    {
+                        if (message.commandType == "treadmill.connect" || message.commandType == "treadmill.disconnect" ||
+                            message.commandType == "treadmill.manual")
+                        {
+                            PauseTarget();
+                        }
+                        success = RemoteControlCommands.TryApplyTreadmill(incoming.Json, _treadmill, out error);
+                    }
+                    else
+                    {
+                        success = _testScene != null
+                            ? RemoteControlCommands.TryApplyTestScene(incoming.Json, _testScene, out error)
+                            : RemoteControlCommands.TryApply(incoming.Json, _tracker, _placement, out error);
+                    }
                 }
             }
             catch (Exception exception)
@@ -331,6 +360,8 @@ namespace PaceScape.RemoteControl
                 state = new RemoteState
                 {
                     deviceName = SystemInfo.deviceName,
+                    treadmillControlVersion = 1,
+                    treadmill = _treadmill != null ? _treadmill.CaptureState() : null,
                     isEditor = Application.isEditor,
                     trackingEnabled = _tracker.isActiveAndEnabled,
                     phase = _tracker.Phase.ToString(),
@@ -472,6 +503,10 @@ namespace PaceScape.RemoteControl
         private void OnDisable()
         {
             PauseTarget();
+            if (_treadmill != null)
+            {
+                _treadmill.enabled = false;
+            }
             _session?.Stop();
         }
     }
