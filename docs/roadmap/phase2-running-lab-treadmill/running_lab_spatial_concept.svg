@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="1600" height="1000" viewBox="0 0 1600 1000">
+<title>Magic Leap 2 running lab: isometric concept setup and data flow</title>
+<desc>Editable vector concept diagram showing a runner on treadmill wearing Magic Leap 2, the Femto Bolt RGB-D camera, a local workstation, augmented cadence, posture and ghost cues, and offline Ochy integration.</desc>
+<defs>
+ <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0D1728"/><stop offset="1" stop-color="#162A3B"/></linearGradient>
+ <linearGradient id="deck" x2="0" y2="1"><stop stop-color="#34465B"/><stop offset="1" stop-color="#192633"/></linearGradient>
+ <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.3" fill="#4D6777" opacity=".22"/></pattern>
+ <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6" fill="none" stroke="#52DABF" stroke-width="1.6"/></marker>
+ <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6" fill="none" stroke="#B3A2FF" stroke-width="1.6"/></marker>
+ <filter id="glow"><feGaussianBlur stdDeviation="4"/></filter>
+</defs>
+<rect width="1600" height="1000" fill="url(#bg)"/><rect width="1600" height="1000" fill="url(#dots)"/>
+<g id="heading" font-family="DejaVu Sans,Arial,sans-serif">
+ <text x="82" y="89" fill="#F0F6F9" font-size="39" font-weight="700">RUNNING LAB  /  SPATIAL COACH</text>
+ <text x="84" y="130" fill="#A4BAC7" font-size="19">Magic Leap 2  ·  Treadmill-first proof of concept  ·  Concept layout (not to scale)</text>
+ <path d="M82 156H1518" stroke="#3A5365" stroke-width="2"/>
+</g>
+<g id="treadmill-setup">
+ <!-- floor and shadow -->
+ <ellipse cx="748" cy="778" rx="450" ry="104" fill="#07121D" opacity=".65"/>
+ <path d="M290 722L912 907 1328 692 707 519Z" fill="#263749" opacity=".26" stroke="#456376" stroke-width="1.5"/>
+ <!-- treadmill platform isometric -->
+ <path d="M388 724L813 847 1132 679 715 558Z" fill="#1D2A39" stroke="#84A3B5" stroke-width="3"/>
+ <path d="M388 724v32L813 879v-32Z" fill="#14212F" stroke="#5E7D8F" stroke-width="2"/>
+ <path d="M813 847v32l319-168v-32Z" fill="#213448" stroke="#5E7D8F" stroke-width="2"/>
+ <path d="M448 717L813 820 1063 686 703 584Z" fill="url(#deck)" stroke="#567E93" stroke-width="2"/>
+ <!-- moving belt lines -->
+ <path d="M524 715l330 94M603 680l335 97M676 641l339 93" fill="none" stroke="#435E71" stroke-width="2" stroke-dasharray="17 15"/>
+ <!-- treadmill uprights and console -->
+ <path d="M1031 691L1070 469M860 814L900 582" stroke="#6B8293" stroke-width="12" stroke-linecap="round"/>
+ <path d="M891 565L1066 480" stroke="#859CAB" stroke-width="13" stroke-linecap="round"/>
+ <path d="M1001 491l66-27 38 29-65 31Z" fill="#263D4F" stroke="#93A9B7" stroke-width="2"/>
+ <rect x="1034" y="482" width="26" height="9" rx="4" fill="#62E3CA" transform="rotate(-23 1034 482)"/>
+ <path d="M882 577l-61-30M1052 489l-37-25" stroke="#758E9F" stroke-width="8" stroke-linecap="round"/>
+ <!-- footprint rings on treadmill deck -->
+ <ellipse cx="735" cy="756" rx="54" ry="24" transform="rotate(16 735 756)" fill="#37D7D0" fill-opacity=".09" stroke="#46E4D5" stroke-width="3" stroke-dasharray="7 7"/>
+ <ellipse cx="850" cy="707" rx="50" ry="24" transform="rotate(16 850 707)" fill="#37D7D0" fill-opacity=".08" stroke="#46E4D5" stroke-width="3" stroke-dasharray="7 7"/>
+ <path d="M737 734v-26M851 686v-25" stroke="#4AF1E0" stroke-width="2" stroke-dasharray="4 4"/>
+ </g>
+ <!-- ghost silhouette behind runner -->
+ <g id="ghost-runner" opacity=".46" stroke="#B5A0FF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none" transform="translate(66,-24)">
+  <circle cx="760" cy="319" r="29" stroke-width="6"/>
+  <path d="M757 355l8 116-54 79 7 81M763 471l86 75-35 93M755 383l-68 62 24 51M767 386l67 52-8 35"/>
+  <path d="M714 635l-26 16M813 640l25 7"/>
+ </g>
+ <!-- runner -->
+ <g id="runner" stroke-linecap="round" stroke-linejoin="round">
+  <!-- limbs dark outline -->
+  <path d="M748 371l-21 115-45 75 24 122" fill="none" stroke="#091826" stroke-width="34"/>
+  <path d="M731 480l105 75-40 116" fill="none" stroke="#091826" stroke-width="33"/>
+  <path d="M748 385l-77 67 30 70M756 390l66 54-22 53" fill="none" stroke="#091826" stroke-width="26"/>
+  <!-- shapes -->
+  <path d="M748 371l-21 115-45 75 24 122" fill="none" stroke="#E4B28B" stroke-width="23"/>
+  <path d="M731 480l105 75-40 116" fill="none" stroke="#E4B28B" stroke-width="22"/>
+  <path d="M748 385l-77 67 30 70M756 390l66 54-22 53" fill="none" stroke="#D89D79" stroke-width="17"/>
+  <path d="M733 358Q746 346 767 358L788 464Q763 498 719 482Z" fill="#E2A842" stroke="#192C3D" stroke-width="4"/>
+  <path d="M722 470q33 17 68-5l-12 40-52-12Z" fill="#3E728A"/>
+  <circle cx="751" cy="313" r="34" fill="#E5B28B" stroke="#152738" stroke-width="5"/>
+  <path d="M720 303q4-46 43-32 24 6 22 34l-23-7-13-19-5 16Z" fill="#25364B"/>
+  <path d="M718 306l70-1 7 19-71 2Z" fill="#182938" stroke="#52D9C0" stroke-width="3"/>
+  <path d="M704 680l-23 16 50 12 13-14-21-10ZM789 673l-3 24 46-8-8-18Z" fill="#D5F1F5" stroke="#183345" stroke-width="4"/>
+  <!-- pose joints -->
+  <g fill="#83EBDD" stroke="#163849" stroke-width="3"><circle cx="727" cy="486" r="7"/><circle cx="683" cy="560" r="7"/><circle cx="835" cy="556" r="7"/><circle cx="700" cy="679" r="7"/><circle cx="795" cy="669" r="7"/><circle cx="754" cy="389" r="7"/></g>
+ </g>
+ <!-- posture cue and spatial reference -->
+ <g id="posture-cues">
+ <path d="M698 336l-24 172" fill="none" stroke="#46DDCC" stroke-width="2" stroke-dasharray="8 8"/>
+ <path d="M746 360l-23 127" fill="none" stroke="#50E3D0" stroke-width="3"/>
+ <path d="M733 395A45 45 0 0 0 708 417" fill="none" stroke="#62EEDC" stroke-width="3"/>
+ <circle cx="710" cy="413" r="5" fill="#68EEDE"/>
+ </g>
+ <!-- camera: left on tripod -->
+ <g id="rgbd-camera">
+  <path d="M270 542l-63 203M270 542l76 198M270 542l-7 214" stroke="#8EA7B6" stroke-width="8" stroke-linecap="round"/>
+  <rect x="219" y="501" width="112" height="58" rx="11" fill="#B7C6C9" stroke="#1A3344" stroke-width="4"/>
+  <circle cx="250" cy="530" r="13" fill="#193548" stroke="#5EDCCA" stroke-width="4"/>
+  <circle cx="292" cy="530" r="13" fill="#193548" stroke="#88A6F2" stroke-width="4"/>
+  <rect x="260" y="554" width="29" height="16" rx="5" fill="#5F7C8B"/>
+  <!-- sensor cone -->
+  <path d="M327 517L680 350 925 731 320 549Z" fill="#55DCC6" opacity=".08"/>
+  <path d="M325 517L679 349M325 549L925 731" fill="none" stroke="#59E1CE" stroke-width="2" stroke-dasharray="11 9" opacity=".67"/>
+ </g>
+ <!-- workstation -->
+ <g id="workstation">
+  <path d="M1169 798l158-78 103 39-161 82Z" fill="#324A5E" stroke="#93AABB" stroke-width="2"/>
+  <path d="M1210 678l153-43 10 104-152 44Z" fill="#1E3243" stroke="#A3B8C7" stroke-width="5"/>
+  <path d="M1226 685l122-34 8 73-124 37Z" fill="#0B2738"/>
+  <!-- miniature skeleton on monitor -->
+  <g stroke="#4DE9D3" stroke-width="3" fill="none"><circle cx="1293" cy="670" r="7"/><path d="M1293 678l2 28-18 21m18-21 21 14m-21-28-15 11m15-11 17 9"/></g>
+  <path d="M1279 751v23m-36 14l63-18" stroke="#9CB4BF" stroke-width="5"/>
+  <rect x="1176" y="762" width="46" height="59" rx="7" fill="#233A4F" stroke="#8BA6B7" stroke-width="2"/>
+  <circle cx="1199" cy="773" r="4" fill="#49E1C9"/>
+ </g>
+ <!-- labels and cards -->
+ <g id="labels" font-family="DejaVu Sans,Arial,sans-serif">
+  <g id="label-headset"><rect x="845" y="203" rx="14" width="271" height="81" fill="#223949" stroke="#5ACFC3" stroke-width="1.5"/><text x="868" y="237" fill="#F1F8F9" font-weight="700" font-size="21">MAGIC LEAP 2</text><text x="868" y="261" fill="#AFC9D4" font-size="16">Spatial coaching overlay</text><path d="M846 267l-66 38" stroke="#5ACFC3" stroke-width="2"/></g>
+  <g id="label-sensor"><rect x="93" y="338" rx="14" width="300" height="103" fill="#203B4B" stroke="#6BE5D6" stroke-width="1.5"/><text x="115" y="375" fill="#EEF8FA" font-size="21" font-weight="700">FEMTO BOLT</text><text x="115" y="403" fill="#B7D0D6" font-size="16">Fixed RGB-D + skeleton</text><text x="115" y="427" fill="#90B1C1" font-size="14">Front/side-oblique tracking</text><path d="M260 441l7 59" stroke="#65E4D4" stroke-width="2"/></g>
+  <g id="cadence-label"><rect x="378" y="183" rx="14" width="286" height="103" fill="#263E4D" stroke="#53DED0" stroke-width="1.5"/><text x="402" y="218" fill="#8AF4E7" font-size="16" font-weight="700">LIVE CUE / EXAMPLE</text><text x="402" y="252" fill="#F6FAFB" font-size="31" font-weight="700">172 <tspan font-size="16">spm</tspan></text><path d="M624 286L731 355" stroke="#53DED0" stroke-width="2" stroke-dasharray="6 6"/></g>
+  <g id="ring-label"><rect x="300" y="823" rx="13" width="337" height="67" fill="#203949" stroke="#58E2D4"/><text x="324" y="852" font-size="19" font-weight="700" fill="#F1F8F9">Step-timing rings</text><text x="324" y="876" font-size="15" fill="#A9C8D0">Treadmill-anchored target zones</text><path d="M612 825L731 762" stroke="#5EE5D6" stroke-width="2"/></g>
+  <g id="ghost-label"><rect x="1108" y="306" rx="13" width="391" height="83" fill="#302F51" stroke="#B4A2FF"/><text x="1133" y="342" fill="#F5F0FF" font-size="21" font-weight="700">GHOST PACER / REPLAY</text><text x="1133" y="366" fill="#C9C2E8" font-size="16">Translucent stride-phase reference</text><path d="M1108 348L881 423" fill="none" stroke="#B4A2FF" stroke-width="2" stroke-dasharray="8 6"/></g>
+  <g id="pc-label"><rect x="1175" y="852" rx="13" width="337" height="74" fill="#203746" stroke="#7B9AAD"/><text x="1197" y="882" fill="#F2F8F9" font-size="20" font-weight="700">LOCAL WORKSTATION</text><text x="1197" y="906" fill="#ADC2CA" font-size="15">Pose → gait events → stream</text></g>
+ </g>
+ <!-- data flow paths -->
+ <g id="data-paths" fill="none" stroke-linecap="round">
+  <path d="M322 564C350 946 958 962 1164 785" stroke="#57DACA" stroke-width="3" stroke-dasharray="11 9" marker-end="url(#arrow)"/>
+  <path d="M1219 637C1226 520 1151 296 1108 262" stroke="#B8A9FC" stroke-width="3" stroke-dasharray="10 9" marker-end="url(#arrowPurple)"/>
+ </g>
+ <g font-family="DejaVu Sans,Arial,sans-serif"><text x="778" y="947" fill="#88DACC" font-size="16" text-anchor="middle">RGB-D capture / pose data</text><text x="1246" y="512" fill="#D0C4FF" font-size="16" transform="rotate(-68 1246 512)">Live metrics to headset</text></g>
+ <g id="footer" font-family="DejaVu Sans,Arial,sans-serif"><rect x="83" y="947" width="480" height="35" rx="9" fill="#283748"/><circle cx="105" cy="964" r="5" fill="#5DE0CC"/><text x="120" y="969" font-size="14" fill="#D2E1E7">LIVE TRACKING</text><circle cx="279" cy="964" r="5" fill="#B4A2FF"/><text x="295" y="969" font-size="14" fill="#D2E1E7">AR / GHOST</text><text x="1468" y="971" text-anchor="end" fill="#829AA9" font-size="13">Editable schematic · equipment positions illustrative</text></g>
+</svg>
