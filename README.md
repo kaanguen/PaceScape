@@ -1,14 +1,17 @@
 <div align="center">
 
-  <img src="docs/assets/pacescape-logo.png" alt="PaceScape" width="520">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pacescape-logo-dark.svg">
+    <img src="docs/assets/pacescape-logo-light.svg" alt="PaceScape – Läufer mit AR-Brille" width="440">
+  </picture>
 
   <h3>Lauftraining trifft Augmented Reality.</h3>
   <p>Eine virtuelle Strecke. Ein Laufpartner. Deine reale Umgebung.</p>
 
   <img src="https://img.shields.io/badge/Unity-2022.3-222222?style=flat-square" alt="Unity 2022.3">
-  <img src="https://img.shields.io/badge/Headset-Magic_Leap_2-00CDB5?style=flat-square" alt="Magic Leap 2">
-  <img src="https://img.shields.io/badge/XR-OpenXR-7952FF?style=flat-square" alt="OpenXR">
-  <img src="https://img.shields.io/badge/Status-Früher_Prototyp-7952FF?style=flat-square" alt="Status: Früher Prototyp">
+  <img src="https://img.shields.io/badge/Headset-Magic_Leap_2-55555f?style=flat-square" alt="Magic Leap 2">
+  <img src="https://img.shields.io/badge/XR-OpenXR-55555f?style=flat-square" alt="OpenXR">
+  <img src="https://img.shields.io/badge/Status-Früher_Prototyp-55555f?style=flat-square" alt="Status: Früher Prototyp">
 
   <br><br>
   <a href="#die-idee">Die Idee</a> &nbsp;·&nbsp;
