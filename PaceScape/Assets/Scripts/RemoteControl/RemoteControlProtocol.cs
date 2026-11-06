@@ -8,6 +8,32 @@ using UnityEngine;
 namespace PaceScape.RemoteControl
 {
     // Public wire fields deliberately match the camelCase JSON contract used by the server.
+    // Separate outbound envelopes avoid serializing command-validation sentinels such as NaN.
+    [Serializable]
+    internal sealed class RemoteHelloMessage
+    {
+        public string type = "hello";
+        public int protocol = 1;
+        public string role = "headset";
+        public string token;
+    }
+
+    [Serializable]
+    internal sealed class RemoteAckMessage
+    {
+        public string type = "ack";
+        public string commandId;
+        public bool success;
+        public string error;
+    }
+
+    [Serializable]
+    internal sealed class RemoteStateMessage
+    {
+        public string type = "state";
+        public RemoteState state;
+    }
+
     [Serializable]
     internal sealed class RemoteMessage
     {
@@ -50,6 +76,8 @@ namespace PaceScape.RemoteControl
     internal sealed class RemoteState
     {
         public string deviceName;
+        public int cameraControlVersion;
+        public RemoteCameraState camera;
         public int treadmillControlVersion;
         public TreadmillState treadmill;
         public bool isEditor;

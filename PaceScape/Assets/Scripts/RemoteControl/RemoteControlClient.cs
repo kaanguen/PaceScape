@@ -38,6 +38,7 @@ namespace PaceScape.RemoteControl
             public readonly ClientWebSocket Socket = new ClientWebSocket();
             public Task Task;
             public string LatestState;
+            public byte[] LatestCameraFrame;
             public string Error;
             public volatile bool IsConnected;
 
@@ -55,6 +56,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
+        private RemoteCameraStream _cameraStream;
         private RunnerPerformance _performance;
         private TreadmillInput _treadmill;
         private TagTracker _tracker;
@@ -106,6 +108,14 @@ namespace PaceScape.RemoteControl
             {
                 _treadmill = gameObject.AddComponent<TreadmillInput>();
             }
+            _cameraStream = gameObject.AddComponent<RemoteCameraStream>();
+            _cameraStream.FrameReady += frame =>
+            {
+                if (_session != null && _session.IsConnected)
+                {
+                    Interlocked.Exchange(ref _session.LatestCameraFrame, (byte[])frame.Clone());
+                }
+            };
             _performance = gameObject.AddComponent<RunnerPerformance>();
             _performance.Bind(_tracker, _treadmill, _testScene);
             if (_tracker != null)
@@ -123,6 +133,7 @@ namespace PaceScape.RemoteControl
         public void ReloadConnectionSettings()
         {
             PauseTarget();
+            _cameraStream?.StopStream();
             _session?.Stop();
             _reloadConnectionRequested = true;
         }
@@ -135,6 +146,7 @@ namespace PaceScape.RemoteControl
             try
             {
                 RemoteControlSettings defaults = Resources.Load<RemoteControlSettings>(RemoteControlSettings.ResourceName);
+                string settingsSource = defaults != null ? "project defaults" : "built-in defaults";
                 if (defaults != null)
                 {
                     _settings.Enabled = defaults.ConnectionEnabled;
@@ -146,6 +158,7 @@ namespace PaceScape.RemoteControl
                 if (!Application.isEditor && File.Exists(path))
                 {
                     JsonUtility.FromJsonOverwrite(File.ReadAllText(path), _settings);
+                    settingsSource = "device override (pacescape-control.json)";
                 }
 
                 if (!_settings.Enabled)
@@ -159,7 +172,7 @@ namespace PaceScape.RemoteControl
                     return;
                 }
 
-                _hello = JsonUtility.ToJson(new RemoteMessage
+                _hello = JsonUtility.ToJson(new RemoteHelloMessage
                 {
                     type = "hello",
                     protocol = 1,
@@ -167,6 +180,7 @@ namespace PaceScape.RemoteControl
                     token = _settings.AccessToken
                 });
                 _isConfigured = _testScene != null || _tracker != null;
+                Debug.Log($"[RemoteControl] Endpoint: {_serverUri.AbsoluteUri}; source: {settingsSource}.", this);
             }
             catch (Exception exception)
             {
@@ -192,11 +206,13 @@ namespace PaceScape.RemoteControl
 
             if (!_isConfigured || _isPaused || (_tracker == null && _testScene == null))
             {
+                _cameraStream?.StopStream();
                 return;
             }
 
             if (_session != null && _session.Task.IsCompleted)
             {
+                _cameraStream?.StopStream();
                 PauseTarget();
                 if (!string.IsNullOrEmpty(_session.Error))
                 {
@@ -231,11 +247,13 @@ namespace PaceScape.RemoteControl
                         RemoteMessage welcome = JsonUtility.FromJson<RemoteMessage>(incoming.Json);
                         if (welcome == null || welcome.type != "welcome" || welcome.protocol != 1)
                         {
+                            _session.Error = "Handshake: expected protocol 1 welcome";
                             _session.Stop();
                             return;
                         }
 
                         _session.IsConnected = true;
+                        Debug.Log("[RemoteControl] Server welcome received; connection ready.", this);
                         _lastControlAt = Time.unscaledTime;
                     }
                     catch (Exception)
@@ -272,16 +290,20 @@ namespace PaceScape.RemoteControl
 
             if (_session.IsConnected && Time.unscaledTime - _lastControlAt > 6f)
             {
+                _session.Error = "Heartbeat: no recent control message for 6 seconds";
                 PauseTarget();
+                _cameraStream?.StopStream();
                 _session.Stop();
                 return;
             }
 
             if (!_session.IsConnected)
             {
+                _cameraStream?.StopStream();
                 PauseTarget();
                 if (Time.unscaledTime - _connectionStartedAt > 10f)
                 {
+                    _session.Error = "Handshake: no welcome within 10 seconds";
                     _session.Stop();
                 }
 
@@ -311,7 +333,16 @@ namespace PaceScape.RemoteControl
                 }
                 else
                 {
-                    if (message != null && message.commandType != null &&
+                    if (message != null && message.payload != null && message.commandType != null &&
+                        message.commandType.StartsWith("camera.", StringComparison.Ordinal))
+                    {
+                        success = _cameraStream.TryApply(message.commandType, out error);
+                        if (message.commandType == "camera.stop")
+                        {
+                            Interlocked.Exchange(ref _session.LatestCameraFrame, null);
+                        }
+                    }
+                    else if (message != null && message.commandType != null &&
                         message.commandType.StartsWith("treadmill.", StringComparison.Ordinal))
                     {
                         success = RemoteControlCommands.TryApplyTreadmill(incoming.Json, _treadmill, out error);
@@ -332,7 +363,7 @@ namespace PaceScape.RemoteControl
             // Publish the actual applied state before acknowledging so the dashboard cannot show optimistic values.
             Interlocked.Exchange(ref _session.LatestState, null);
             _session.Outgoing.Enqueue(CreateStateJson());
-            _session.Outgoing.Enqueue(JsonUtility.ToJson(new RemoteMessage
+            _session.Outgoing.Enqueue(JsonUtility.ToJson(new RemoteAckMessage
             {
                 type = "ack",
                 commandId = commandId,
@@ -358,17 +389,21 @@ namespace PaceScape.RemoteControl
             if (_testScene != null)
             {
                 RemoteState preview = _testScene.CaptureState();
+                preview.cameraControlVersion = 1;
+                preview.camera = _cameraStream.CaptureState();
                 preview.comparisonControlVersion = 1;
                 preview.performance = _performance != null ? _performance.CaptureState() : null;
-                return JsonUtility.ToJson(new RemoteMessage { type = "state", state = preview });
+                return JsonUtility.ToJson(new RemoteStateMessage { type = "state", state = preview });
             }
 
-            return JsonUtility.ToJson(new RemoteMessage
+            return JsonUtility.ToJson(new RemoteStateMessage
             {
                 type = "state",
                 state = new RemoteState
                 {
                     deviceName = SystemInfo.deviceName,
+                    cameraControlVersion = 1,
+                    camera = _cameraStream.CaptureState(),
                     treadmillControlVersion = 1,
                     treadmill = _treadmill != null ? _treadmill.CaptureState() : null,
                     isEditor = Application.isEditor,
@@ -408,6 +443,7 @@ namespace PaceScape.RemoteControl
         {
             Task sending = null;
             Task receiving = null;
+            string phase = "WebSocket connect";
             try
             {
                 using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(session.Cancellation.Token))
@@ -416,14 +452,21 @@ namespace PaceScape.RemoteControl
                     await session.Socket.ConnectAsync(uri, timeout.Token).ConfigureAwait(false);
                 }
 
+                phase = "Send hello";
                 await SendAsync(session, hello).ConfigureAwait(false);
+                phase = "Send/receive";
                 sending = SendLoopAsync(session);
                 receiving = ReceiveLoopAsync(session);
-                await Task.WhenAny(sending, receiving).ConfigureAwait(false);
+                Task completed = await Task.WhenAny(sending, receiving).ConfigureAwait(false);
+                // Observe the original failure before cancelling the other loop during cleanup.
+                await completed.ConfigureAwait(false);
             }
             catch (Exception exception)
             {
-                session.Error = exception.GetType().Name;
+                if (string.IsNullOrEmpty(session.Error) && !session.Cancellation.IsCancellationRequested)
+                {
+                    session.Error = $"{phase}: {exception.GetType().Name}: {exception.Message}";
+                }
             }
             finally
             {
@@ -436,9 +479,9 @@ namespace PaceScape.RemoteControl
                         await Task.WhenAll(sending, receiving).ConfigureAwait(false);
                     }
                 }
-                catch (Exception exception)
+                catch (Exception)
                 {
-                    session.Error = exception.GetType().Name;
+                    // Cleanup cancellation must not replace the original transport or server error.
                 }
 
                 session.Socket.Dispose();
@@ -462,6 +505,12 @@ namespace PaceScape.RemoteControl
                     await SendAsync(session, state).ConfigureAwait(false);
                 }
 
+                byte[] frame = Interlocked.Exchange(ref session.LatestCameraFrame, null);
+                if (frame != null && session.IsConnected)
+                {
+                    await session.Socket.SendAsync(new ArraySegment<byte>(frame), WebSocketMessageType.Binary,
+                        true, token).ConfigureAwait(false);
+                }
                 await Task.Delay(50, token).ConfigureAwait(false);
             }
         }
@@ -486,6 +535,7 @@ namespace PaceScape.RemoteControl
                         session.Cancellation.Token).ConfigureAwait(false);
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
+                        session.Error = $"Server closed WebSocket: {result.CloseStatus}; {result.CloseStatusDescription}";
                         return;
                     }
 
@@ -513,12 +563,14 @@ namespace PaceScape.RemoteControl
             if (isPaused)
             {
                 PauseTarget();
+                _cameraStream?.StopStream();
                 _session?.Stop();
             }
         }
 
         private void OnDisable()
         {
+            _cameraStream?.StopStream();
             PauseTarget();
             if (_treadmill != null)
             {

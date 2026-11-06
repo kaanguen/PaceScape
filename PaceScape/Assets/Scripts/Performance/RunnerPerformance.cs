@@ -20,6 +20,8 @@ namespace PaceScape.Performance
         private readonly DistancePerformance _laps = new DistancePerformance();
         private readonly RollingDistanceBest _efforts = new RollingDistanceBest();
         private readonly GhostReplay _replay = new GhostReplay();
+        private bool _sessionNewPersonalBest;
+        private double _sessionPreviousBestSeconds;
         private bool _hasReplay;
         private double _ghostDistance;
         private bool _hasMeasurementGap;
@@ -101,6 +103,8 @@ namespace PaceScape.Performance
         /// <summary>Clears this session's statistics while retaining real all-time records and settings.</summary>
         public void ResetSession()
         {
+            _sessionPreviousBestSeconds = _book.Find(ComparisonDistanceMetres);
+            _sessionNewPersonalBest = false;
             _laps.TryReset(ComparisonDistanceMetres);
             _efforts.Reset(ComparisonDistanceMetres);
             _wasMeasuring = false;
@@ -234,6 +238,7 @@ namespace PaceScape.Performance
             {
                 return;
             }
+            _sessionNewPersonalBest = true;
             _pendingJson = JsonUtility.ToJson(_book);
         }
 
@@ -336,6 +341,9 @@ namespace PaceScape.Performance
             double real = _book.Find(ComparisonDistanceMetres);
             return new PerformanceState
             {
+                sessionRecordVersion = 1,
+                sessionPreviousBestSeconds = _sessionPreviousBestSeconds,
+                sessionNewPersonalBest = _sessionNewPersonalBest,
                 ghostReplayVersion = 1,
                 ghostReferenceDistanceMetres = _hasReplay ? _replay.ReferenceDistanceMetres : ComparisonDistanceMetres,
                 ghostPlayback = !_hasReplay ? "NotStarted" : _replay.IsHoldingSpeed ? "HoldingSpeed" :
@@ -442,6 +450,9 @@ namespace PaceScape.Performance
     [Serializable]
     internal sealed class PerformanceState
     {
+        public int sessionRecordVersion;
+        public double sessionPreviousBestSeconds;
+        public bool sessionNewPersonalBest;
         public int ghostReplayVersion;
         public int ghostReferenceDistanceMetres;
         public string ghostPlayback;

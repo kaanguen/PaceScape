@@ -152,6 +152,19 @@ namespace PaceScape.Tests
             Assert.That(Property(_tracker, "Mode").ToString(), Is.EqualTo("AllTimePersonalBest"));
         }
 
+        [TestCase("RemoteHelloMessage", "hello")]
+        [TestCase("RemoteAckMessage", "ack")]
+        [TestCase("RemoteStateMessage", "state")]
+        public void OutboundMessagesExcludeCommandValidationSentinels(string typeName, string messageType)
+        {
+            object message = Activator.CreateInstance(RuntimeType("RemoteControl." + typeName));
+            string json = JsonUtility.ToJson(message);
+            Assert.That(json, Does.Contain("\"type\":\"" + messageType + "\""));
+            Assert.That(json, Does.Not.Contain("\"payload\""));
+            Assert.That(json, Does.Not.Contain("NaN"));
+            Assert.That(json, Does.Not.Contain("Infinity"));
+        }
+
         private bool Apply(string command, string payload)
         {
             string json = "{\"type\":\"command\",\"commandId\":\"test\",\"commandType\":\"" + command + "\",\"payload\":" + payload + "}";
