@@ -35,7 +35,13 @@ namespace PaceScape.RemoteControl
         /// <summary>Changes mode while retaining the visual position and pausing an active run.</summary>
         public bool TrySetRunnerMode(string mode)
         {
-            return _session.TrySetMode(mode);
+            RunningSession.RunnerMode previous = _session.Mode;
+            bool success = _session.TrySetMode(mode);
+            if (success && previous != _session.Mode)
+            {
+                PerformanceSource?.RunnerModeChanged();
+            }
+            return success;
         }
 
         /// <summary>Gets whether this scene can start or resume its runner.</summary>
@@ -59,8 +65,17 @@ namespace PaceScape.RemoteControl
         {
             if (HasRunner && !_isPaused)
             {
-                _session.Advance(_motion, Time.unscaledDeltaTime,
-                    PerformanceSource != null ? PerformanceSource.GetTargetPace(_session.Mode, _pace) : _pace);
+                if (_session.State == RunningSession.RunState.Running &&
+                    _session.Mode == RunningSession.RunnerMode.AllTimePersonalBest && PerformanceSource != null)
+                {
+                    double travel = PerformanceSource.AdvanceGhost(Time.unscaledDeltaTime, _motion.TravelledMetres, _pace);
+                    _motion.AdvanceRecorded(Time.unscaledDeltaTime, travel, PerformanceSource.GhostSpeedMetresPerSecond);
+                }
+                else
+                {
+                    _session.Advance(_motion, Time.unscaledDeltaTime, _pace);
+                    PerformanceSource?.ObserveGhostDistance(_motion.TravelledMetres);
+                }
             }
         }
 

@@ -381,6 +381,8 @@ namespace PaceScape.RemoteControl
                     runnerControlVersion = 1,
                     runnerModeControlVersion = 1,
                     ghostControlVersion = 1,
+                    ghostPresentationVersion = 1,
+                    ghostPresentation = _tracker.CaptureGhostPresentation(),
                     runnerMode = _tracker.Mode.ToString(),
                     comparisonControlVersion = 1,
                     performance = _performance != null ? _performance.CaptureState() : null,

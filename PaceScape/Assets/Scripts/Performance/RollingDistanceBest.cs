@@ -22,6 +22,38 @@ namespace PaceScape.Performance
         private double _time;
         private double _previousSpeed = -1;
         private double _length = 400;
+        private double _bestStartTime;
+        private double _bestEndTime;
+        private double _bestStartDistance;
+        private bool _isReportingBest;
+
+        /// <summary>Copies the winning window during Improved, before old interpolation points are pruned.</summary>
+        public List<EffortPoint> CopyImprovedTrace()
+        {
+            if (!_isReportingBest)
+            {
+                throw new InvalidOperationException("Copy the trace synchronously from Improved.");
+            }
+            if (_points.Count > 31998)
+            {
+                return null;
+            }
+            var trace = new List<EffortPoint>();
+            trace.Add(new EffortPoint { seconds = 0, distanceMetres = 0 });
+            foreach (Point point in _points)
+            {
+                if (point.Time > _bestStartTime && point.Time < _bestEndTime)
+                {
+                    trace.Add(new EffortPoint
+                    {
+                        seconds = point.Time - _bestStartTime,
+                        distanceMetres = Math.Max(0, Math.Min(_length, point.Distance - _bestStartDistance))
+                    });
+                }
+            }
+            trace.Add(new EffortPoint { seconds = BestSeconds, distanceMetres = _length });
+            return trace;
+        }
 
         /// <summary>Gets the best complete continuous effort, or zero before a result.</summary>
         public double BestSeconds { get; private set; }
@@ -140,7 +172,18 @@ namespace PaceScape.Performance
             if (duration > 0 && (BestSeconds <= 0 || duration < BestSeconds - 0.0000001))
             {
                 BestSeconds = duration;
-                Improved?.Invoke(_length, duration);
+                _bestStartTime = startTime;
+                _bestEndTime = endTime;
+                _bestStartDistance = startDistance;
+                _isReportingBest = true;
+                try
+                {
+                    Improved?.Invoke(_length, duration);
+                }
+                finally
+                {
+                    _isReportingBest = false;
+                }
             }
         }
     }

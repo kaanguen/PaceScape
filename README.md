@@ -42,7 +42,8 @@
 
 **[PaceScape Control](https://github.com/kaanguen/PaceScapeControll)** ist das separate Server-Projekt zur Steuerung der App. Das Dashboard läuft lokal am Rechner und verbindet sich über **WebSockets** mit PaceScape auf der Magic Leap 2.
 
-- **Ghost:** Genau zwei Tempoquellen: voreingestellte Geschwindigkeit oder gespeicherter Allzeit-PR für die gewählte Distanz. Deine Laufbandmessung bestimmt deine Strecke, Runden und Bestzeiten unabhängig vom Ghost. [Einrichtung](docs/ghost-comparison.md).
+- **Ghost:** Genau zwei Tempoquellen: voreingestellte Geschwindigkeit oder Tempoverlauf eines gespeicherten Allzeit-PRs. Nach dessen Distanz wechselt der Ghost zu längeren vorhandenen PRs; ohne weiteren PR hält er sein letztes Tempo. Alte Rekorde ohne Verlauf nutzen ihre Durchschnittspace. Deine Laufbandmessung bestimmt deine Strecke, Runden und Bestzeiten unabhängig vom Ghost. [Einrichtung](docs/ghost-comparison.md).
+- **Laufbandansicht:** Optional den Ghost seitlich vor, neben oder hinter dem kalibrierten Laufbandplatz darstellen. Sein Tempo bleibt unabhängig; außerhalb der einstellbaren Sichtdistanz wird er ausgeblendet. Eine gekennzeichnete Vorschau ist unter **PaceScape → Ghost-Vorschau (Testdaten)** im Unity-Editor verfügbar.
 - **Pace:** Zieltempo live für bereits platzierte und neue Objekte einstellen.
 - **Läufer einstellen:** Pace, Spur 1–8 und Startabstand gemeinsam übernehmen. Wartende Läufer werden direkt an die eingestellte Startposition gesetzt.
 - **Lauf:** Der platzierte Läufer wartet auf „Lauf starten“. Pause hält seine Position; Weiterlaufen setzt den Lauf fort. Zurücksetzen beendet den Lauf und stellt die Startposition wieder her.

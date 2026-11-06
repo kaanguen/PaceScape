@@ -1,5 +1,6 @@
 using System;
 using PaceScape.Performance;
+using PaceScape.RunningTrack;
 using PaceScape.Tracking;
 using PaceScape.Treadmill;
 using UnityEngine;
@@ -28,6 +29,9 @@ namespace PaceScape.RemoteControl
         // Sentinels ensure omitted numeric members fail validation instead of silently becoming zero.
         public string deviceId;
         public string runnerMode;
+        public string presentationMode;
+        public float sideOffsetMetres = float.NaN;
+        public float visibilityDistanceMetres = -1;
         public float comparisonDistanceMetres = -1;
         public bool useDemoRecords;
         public float paceMinutesPerKilometre = -1f;
@@ -61,6 +65,8 @@ namespace PaceScape.RemoteControl
         public int runnerControlVersion;
         public int runnerModeControlVersion;
         public int ghostControlVersion;
+        public int ghostPresentationVersion;
+        public GhostPresentationState ghostPresentation;
         public string runnerMode;
         public int comparisonControlVersion;
         public PerformanceState performance;
@@ -168,6 +174,21 @@ namespace PaceScape.RemoteControl
             RemotePayload payload = message.payload;
             switch (message.commandType)
             {
+                case "runner.presentation":
+                    if (tracker.TryConfigureGhostPresentation(payload.presentationMode, payload.sideOffsetMetres,
+                        payload.visibilityDistanceMetres))
+                    {
+                        return true;
+                    }
+                    error = "Reset before changing presentation. Use Track or TreadmillRelative, side offset ±0.5–5 m and visibility distance 1–100 m. Relative mode needs at most one placement.";
+                    return false;
+                case "runner.calibrate":
+                    if (tracker.TryCalibrateGhostPresentation())
+                    {
+                        return true;
+                    }
+                    error = "Calibration requires Ready, treadmill-relative mode, one tracked marker and a tracked head pose. Face the treadmill running direction.";
+                    return false;
                 case "runner.comparison":
                     if (tracker.PerformanceSource != null && tracker.PerformanceSource.TryConfigure(
                         payload.comparisonDistanceMetres, payload.useDemoRecords))

@@ -19,6 +19,11 @@ namespace PaceScape.Performance
         private PersonalBestBook _book = new PersonalBestBook();
         private readonly DistancePerformance _laps = new DistancePerformance();
         private readonly RollingDistanceBest _efforts = new RollingDistanceBest();
+        private readonly GhostReplay _replay = new GhostReplay();
+        private bool _hasReplay;
+        private double _ghostDistance;
+        private bool _hasMeasurementGap;
+        private double _comparisonGhostOrigin;
         private double _lastTime;
         private double _lastSpeed;
         private bool _wasMeasuring;
@@ -33,6 +38,16 @@ namespace PaceScape.Performance
         private bool _isLoaded;
         private string _storageError;
         private string _measurementStatus = "Waiting";
+
+        /// <summary>Gets whether real belt speed is currently fresh; this never selects ghost speed.</summary>
+        public bool HasFreshInput => _input != null && _input.TryGetSpeedKmh(out _);
+
+        /// <summary>Gets the same signed comparison used by telemetry, once continuity is established.</summary>
+        public bool TryGetGhostGap(out double ghostGapMetres)
+        {
+            ghostGapMetres = _ghostDistance - _comparisonGhostOrigin - _laps.TotalDistanceMetres;
+            return _wasMeasuring && !_hasMeasurementGap;
+        }
 
         /// <summary>Gets the selected fixed lap and rolling best-effort distance.</summary>
         public int ComparisonDistanceMetres => (int)_laps.DistanceMetres;
@@ -69,6 +84,10 @@ namespace PaceScape.Performance
                 return false;
             }
             bool changed = distanceMetres != ComparisonDistanceMetres;
+            if (_useDemoRecords != useDemoRecords)
+            {
+                _hasReplay = false;
+            }
             _useDemoRecords = useDemoRecords;
             if (changed)
             {
@@ -87,11 +106,47 @@ namespace PaceScape.Performance
             _wasMeasuring = false;
             _lastTime = Time.realtimeSinceStartupAsDouble;
             _measurementStatus = "Waiting";
+            _hasReplay = false;
+            _ghostDistance = 0;
+            _hasMeasurementGap = false;
         }
 
-        /// <summary>Resolves constant average pace; a real slower first result still replaces target/demo fallback.</summary>
+        /// <summary>Invalidates the reference on mode changes without rewinding physical ghost progress.</summary>
+        public void RunnerModeChanged()
+        {
+            _hasReplay = false;
+        }
+
+        /// <summary>Advances one shared replay step after the scene has verified tracking and run state.</summary>
+        public double AdvanceGhost(float deltaTime, double currentDistance, float fallbackPace)
+        {
+            if (!_hasReplay)
+            {
+                float averageFallback = GetTargetPace(RunningSession.RunnerMode.AllTimePersonalBest, fallbackPace);
+                _replay.Reset(_book, ComparisonDistanceMetres, 1000.0 / (averageFallback * 60.0), currentDistance);
+                _hasReplay = true;
+            }
+            double travel = _replay.Advance(deltaTime);
+            _ghostDistance = _replay.DistanceMetres;
+            return travel;
+        }
+
+        /// <summary>Gets the replay's current speed, including genuine stationary intervals.</summary>
+        public double GhostSpeedMetresPerSecond => _hasReplay ? _replay.SpeedMetresPerSecond : 0;
+
+        /// <summary>Tracks fixed-mode physical travel for progress comparison, never for user measurements.</summary>
+        public void ObserveGhostDistance(double distance)
+        {
+            _ghostDistance = distance;
+        }
+
+        /// <summary>Resolves instantaneous replay pace, or the existing measured/example/preset fallback.</summary>
         public float GetTargetPace(RunningSession.RunnerMode mode, float fallback)
         {
+            if (mode == RunningSession.RunnerMode.AllTimePersonalBest && _hasReplay)
+            {
+                return _replay.SpeedMetresPerSecond > 0 ? (float)(1000 / (_replay.SpeedMetresPerSecond * 60)) : 0;
+            }
             double seconds = mode == RunningSession.RunnerMode.AllTimePersonalBest ? AllTimeSeconds : 0;
             return seconds > 0 ? (float)(seconds * 1000 / ComparisonDistanceMetres / 60) : fallback;
         }
@@ -136,17 +191,32 @@ namespace PaceScape.Performance
             }
             else
             {
+                if (State == RunningSession.RunState.Running && _ghostDistance > 0 &&
+                    (!canMeasure || delta > 2 || delta <= 0))
+                {
+                    _hasMeasurementGap = true;
+                }
                 Interrupt();
                 _measurementStatus = State != RunningSession.RunState.Running ? "Paused" :
                     "NoSignal";
             }
+            if (canMeasure && !_wasMeasuring && !_hasMeasurementGap)
+            {
+                _comparisonGhostOrigin = _ghostDistance;
+            }
             _wasMeasuring = canMeasure;
             _lastSpeed = speed;
             PollSave();
+            // Presentation follows measurement in the same frame and cannot feed back into either clock.
+            _tracker?.ApplyGhostPresentation();
         }
 
         private void Interrupt()
         {
+            if (_wasMeasuring)
+            {
+                _hasMeasurementGap = true;
+            }
             _wasMeasuring = false;
             _laps.Interrupt();
             _efforts.Interrupt();
@@ -154,7 +224,13 @@ namespace PaceScape.Performance
 
         private void RecordBest(double distance, double seconds)
         {
-            if (!_book.TryImprove((int)distance, seconds, DateTime.UtcNow.ToString("O")))
+            double previous = _book.Find((int)distance);
+            if (previous > 0 && seconds >= previous)
+            {
+                return;
+            }
+            if (!_book.TryImproveWithTrace((int)distance, seconds, DateTime.UtcNow.ToString("O"),
+                _efforts.CopyImprovedTrace()))
             {
                 return;
             }
@@ -191,7 +267,7 @@ namespace PaceScape.Performance
 
         private static PersonalBestBook Read(string path)
         {
-            if (new FileInfo(path).Length > 1024 * 1024)
+            if (new FileInfo(path).Length > 8 * 1024 * 1024)
             {
                 throw new InvalidDataException("Record file is too large.");
             }
@@ -260,6 +336,15 @@ namespace PaceScape.Performance
             double real = _book.Find(ComparisonDistanceMetres);
             return new PerformanceState
             {
+                ghostReplayVersion = 1,
+                ghostReferenceDistanceMetres = _hasReplay ? _replay.ReferenceDistanceMetres : ComparisonDistanceMetres,
+                ghostPlayback = !_hasReplay ? "NotStarted" : _replay.IsHoldingSpeed ? "HoldingSpeed" :
+                    _replay.HasTrace ? "RecordedTrace" : _replay.HasMeasuredReference ? "RecordAverage" : "Fallback",
+                ghostReferenceAchievedUtc = _hasReplay ? _replay.AchievedUtc : null,
+                ghostDistanceMetres = _ghostDistance,
+                hasProgressComparison = _wasMeasuring && !_hasMeasurementGap,
+                userLeadMetres = _laps.TotalDistanceMetres - (_ghostDistance - _comparisonGhostOrigin) +
+                    (_tracker != null ? _tracker.RelativeStartOffset : 0),
                 comparisonDistanceMetres = ComparisonDistanceMetres,
                 useDemoRecords = _useDemoRecords,
                 measuredDistanceMetres = _laps.TotalDistanceMetres,
@@ -296,6 +381,17 @@ namespace PaceScape.Performance
                     visible[count - 1] = _book.records[i];
                     break;
                 }
+            }
+            // Detailed replay data is local-only: never exceed the WebSocket relay's 16 KiB limit.
+            for (int i = 0; i < visible.Length; i++)
+            {
+                PersonalBestRecord record = visible[i];
+                visible[i] = new PersonalBestRecord
+                {
+                    distanceMetres = record.distanceMetres,
+                    seconds = record.seconds,
+                    achievedUtc = record.achievedUtc
+                };
             }
             return visible;
         }
@@ -346,6 +442,13 @@ namespace PaceScape.Performance
     [Serializable]
     internal sealed class PerformanceState
     {
+        public int ghostReplayVersion;
+        public int ghostReferenceDistanceMetres;
+        public string ghostPlayback;
+        public string ghostReferenceAchievedUtc;
+        public double ghostDistanceMetres;
+        public bool hasProgressComparison;
+        public double userLeadMetres;
         public int comparisonDistanceMetres;
         public bool useDemoRecords;
         public double measuredDistanceMetres;

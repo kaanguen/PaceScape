@@ -18,6 +18,31 @@ namespace PaceScape.Tests
         }
 
         [Test]
+        public void RecordedMotionUsesExactTravelAndResetClearsUnwrappedProgress()
+        {
+            var root = new GameObject("Recorded motion test");
+            try
+            {
+                Type motionType = Type.GetType("PaceScape.RunningTrack.RunningTrackMotion, Assembly-CSharp", true);
+                object motion = Activator.CreateInstance(motionType, root.transform, 1, 0f);
+                MethodInfo advance = motionType.GetMethod("AdvanceRecorded");
+                advance.Invoke(motion, new object[] { 0.1f, 10.0, 10.0 });
+                advance.Invoke(motion, new object[] { 0.1f, 1.0, 1.0 });
+                Pose expected = (Pose)_geometryType.GetMethod("EvaluateLane").Invoke(null, new object[] { 1, 11.0 });
+                Assert.That(Vector3.Distance(root.transform.localPosition, expected.position), Is.LessThan(0.0001f));
+                Assert.That(motionType.GetProperty("TravelledMetres").GetValue(motion), Is.EqualTo(11.0));
+                advance.Invoke(motion, new object[] { 0.1f, 0.0, 0.0 });
+                Assert.That(motionType.GetProperty("TravelledMetres").GetValue(motion), Is.EqualTo(11.0));
+                motionType.GetMethod("ResetToStart").Invoke(motion, null);
+                Assert.That(motionType.GetProperty("TravelledMetres").GetValue(motion), Is.EqualTo(0.0));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void MarkerIsOnLaneOneAndFacesAlongInitialStraight()
         {
             Assert.That(Evaluate(0f).magnitude, Is.LessThan(0.0001f));

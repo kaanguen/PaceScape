@@ -111,6 +111,19 @@ namespace PaceScape.Tests
         }
 
         [Test]
+        public void RecordedTraceSurvivesUnityJsonRoundTripAndLegacyJsonStillLoads()
+        {
+            const string json = "{\"version\":1,\"records\":[{\"distanceMetres\":100,\"seconds\":15,\"achievedUtc\":\"test\",\"trace\":[{\"seconds\":0,\"distanceMetres\":0},{\"seconds\":10,\"distanceMetres\":50},{\"seconds\":15,\"distanceMetres\":100}]}]}";
+            object book = JsonUtility.FromJson(json, RuntimeType("PersonalBestBook"));
+            Assert.That(Call(book, "IsValid"), Is.True);
+            object restored = JsonUtility.FromJson(JsonUtility.ToJson(book), RuntimeType("PersonalBestBook"));
+            object record = ((IList)restored.GetType().GetField("records").GetValue(restored))[0];
+            Assert.That(Call(record, "HasValidTrace"), Is.True);
+            object legacy = JsonUtility.FromJson("{\"version\":1,\"records\":[{\"distanceMetres\":100,\"seconds\":15}]}", RuntimeType("PersonalBestBook"));
+            Assert.That(Call(legacy, "IsValid"), Is.True);
+        }
+
+        [Test]
         public void DemoFallbackNeverEntersMeasuredBookAndRealSlowerRecordWins()
         {
             var root = new GameObject("PR target selection test");
