@@ -11,8 +11,8 @@ namespace PaceScape.Treadmill
         private SensorMeasurements _measurements;
         private BleDeviceProfile _profile;
 
-        /// <summary>Gets whether runner speed is owned by the treadmill, including while its signal is missing.</summary>
-        public bool FollowTreadmill { get; private set; }
+        /// <summary>Raised when a disconnect or invalid notification breaks measurement continuity.</summary>
+        public event Action MeasurementInterrupted;
 
         private void Awake()
         {
@@ -21,6 +21,7 @@ namespace PaceScape.Treadmill
             _connection.profile = _profile;
             _measurements = gameObject.AddComponent<SensorMeasurements>();
             _measurements.bluetooth = _connection;
+            _measurements.TreadmillSignalLost += OnMeasurementInterrupted;
         }
 
         /// <summary>Reports a fresh speed without treating stopped belts as missing data.</summary>
@@ -30,17 +31,6 @@ namespace PaceScape.Treadmill
             return isActiveAndEnabled && _measurements != null &&
                 _measurements.TryGetTreadmillSpeedKmh(out speedKmh) &&
                 !double.IsNaN(speedKmh) && !double.IsInfinity(speedKmh) && speedKmh >= 0;
-        }
-
-        /// <summary>Gets the effective pace; zero denotes a stationary belt or unavailable signal.</summary>
-        public float GetRunnerPace(float manualPace)
-        {
-            if (!FollowTreadmill)
-            {
-                return manualPace;
-            }
-
-            return TryGetSpeedKmh(out double speed) && speed > 0 ? (float)(60.0 / speed) : 0f;
         }
 
         /// <summary>Applies operator-selected BLE actions. Connection success only means the request was accepted.</summary>
@@ -65,15 +55,9 @@ namespace PaceScape.Treadmill
                     {
                         return false;
                     }
-                    FollowTreadmill = true;
                     return true;
                 case "treadmill.disconnect":
                     _connection.Disconnect();
-                    return true;
-                case "treadmill.manual":
-                    // Disconnect first: switching sources requires a deliberate new run/resume.
-                    _connection.Disconnect();
-                    FollowTreadmill = false;
                     return true;
                 default:
                     error = "Unsupported treadmill command.";
@@ -86,7 +70,6 @@ namespace PaceScape.Treadmill
             var state = new TreadmillState
             {
                 supported = Application.platform == RuntimePlatform.Android && !Application.isEditor,
-                followTreadmill = FollowTreadmill,
                 status = _connection != null ? _connection.Status : "Not initialized."
             };
             if (_connection == null)
@@ -121,8 +104,17 @@ namespace PaceScape.Treadmill
             _connection?.Disconnect();
         }
 
+        private void OnMeasurementInterrupted()
+        {
+            MeasurementInterrupted?.Invoke();
+        }
+
         private void OnDestroy()
         {
+            if (_measurements != null)
+            {
+                _measurements.TreadmillSignalLost -= OnMeasurementInterrupted;
+            }
             if (_profile != null)
             {
                 Destroy(_profile);
@@ -135,7 +127,6 @@ namespace PaceScape.Treadmill
     internal sealed class TreadmillState
     {
         public bool supported;
-        public bool followTreadmill;
         public string status;
         public bool scanning;
         public bool busy;

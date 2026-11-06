@@ -11,6 +11,40 @@ namespace PaceScape.RunningTrack
             Paused
         }
 
+        /// <summary>Selects the ghost's independent reference; user measurements never drive avatar speed directly.</summary>
+        public enum RunnerMode
+        {
+            FixedPace = 1,
+            AllTimePersonalBest = 2
+        }
+
+        /// <summary>Gets the selected speed mode; resets retain this operator setting.</summary>
+        public RunnerMode Mode { get; private set; } = RunnerMode.FixedPace;
+
+        /// <summary>Changes mode atomically, pausing an active run without resetting its position.</summary>
+        public bool TrySetMode(string mode)
+        {
+            RunnerMode selected;
+            switch (mode)
+            {
+                case nameof(RunnerMode.FixedPace):
+                    selected = RunnerMode.FixedPace;
+                    break;
+                case nameof(RunnerMode.AllTimePersonalBest):
+                    selected = RunnerMode.AllTimePersonalBest;
+                    break;
+                default:
+                    return false;
+            }
+
+            if (Mode != selected)
+            {
+                TryPause();
+                Mode = selected;
+            }
+            return true;
+        }
+
         /// <summary>Gets the current running state; new sessions wait for an explicit start.</summary>
         public RunState State { get; private set; } = RunState.Ready;
 

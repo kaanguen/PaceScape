@@ -1,4 +1,5 @@
 using System;
+using PaceScape.Performance;
 using PaceScape.RunningTrack;
 using UnityEngine;
 
@@ -28,6 +29,21 @@ namespace PaceScape.RemoteControl
         /// <summary>Gets the explicit run state.</summary>
         public RunningSession.RunState RunState => _session.State;
 
+        /// <summary>Gets the selected runner mode; the preview uses manual pace without BLE input.</summary>
+        public RunningSession.RunnerMode Mode => _session.Mode;
+
+        /// <summary>Changes mode while retaining the visual position and pausing an active run.</summary>
+        public bool TrySetRunnerMode(string mode)
+        {
+            RunningSession.RunnerMode previous = _session.Mode;
+            bool success = _session.TrySetMode(mode);
+            if (success && previous != _session.Mode)
+            {
+                PerformanceSource?.RunnerModeChanged();
+            }
+            return success;
+        }
+
         /// <summary>Gets whether this scene can start or resume its runner.</summary>
         public bool CanRun => isActiveAndEnabled && !_isPaused && HasRunner;
 
@@ -42,11 +58,24 @@ namespace PaceScape.RemoteControl
             RunningTrackVisual.Create(transform);
         }
 
+        /// <summary>Gets or assigns the shared comparison and record owner.</summary>
+        public RunnerPerformance PerformanceSource { get; set; }
+
         private void Update()
         {
             if (HasRunner && !_isPaused)
             {
-                _session.Advance(_motion, Time.unscaledDeltaTime, _pace);
+                if (_session.State == RunningSession.RunState.Running &&
+                    _session.Mode == RunningSession.RunnerMode.AllTimePersonalBest && PerformanceSource != null)
+                {
+                    double travel = PerformanceSource.AdvanceGhost(Time.unscaledDeltaTime, _motion.TravelledMetres, _pace);
+                    _motion.AdvanceRecorded(Time.unscaledDeltaTime, travel, PerformanceSource.GhostSpeedMetresPerSecond);
+                }
+                else
+                {
+                    _session.Advance(_motion, Time.unscaledDeltaTime, _pace);
+                    PerformanceSource?.ObserveGhostDistance(_motion.TravelledMetres);
+                }
             }
         }
 
@@ -166,6 +195,12 @@ namespace PaceScape.RemoteControl
             bool success = false;
             switch (message.commandType)
             {
+                case "runner.comparison":
+                    success = PerformanceSource != null && PerformanceSource.TryConfigure(p.comparisonDistanceMetres, p.useDemoRecords);
+                    break;
+                case "runner.mode":
+                    success = TrySetRunnerMode(p.runnerMode);
+                    break;
                 case "runner.create":
                     success = TrySpawnRunner(p.paceMinutesPerKilometre, p.spawnLane, p.distanceBehindStartLine);
                     break;
@@ -195,6 +230,7 @@ namespace PaceScape.RemoteControl
                     break;
                 case "run.reset":
                     _session.Reset();
+                    PerformanceSource?.ResetSession();
                     _motion?.ResetToStart();
                     success = true;
                     break;
@@ -222,6 +258,10 @@ namespace PaceScape.RemoteControl
                 startupStatus = "Echte Unity-Testszene ohne Marker, Ebenenerkennung oder räumliche Anker.",
                 startupError = string.Empty,
                 runnerControlVersion = 1,
+                runnerModeControlVersion = 1,
+                ghostControlVersion = 1,
+                runnerMode = _session.Mode.ToString(),
+                activeRunnerPace = PerformanceSource != null ? PerformanceSource.GetTargetPace(_session.Mode, _pace) : _pace,
                 runState = _session.State.ToString(),
                 canRun = CanRun,
                 paceMinutesPerKilometre = _pace,

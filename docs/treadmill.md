@@ -1,6 +1,6 @@
 # Domyos / FTMS treadmill input
 
-PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2ACD`) on Magic Leap 2 through the user's embedded `com.kaan.ble-sensors` package and its pinned Velorexe dependency. The treadmill's reported belt speed drives the virtual runner after an explicit run start. PaceScape does not write speed, incline, start or stop commands to the physical treadmill.
+PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2ACD`) on Magic Leap 2 through the user's embedded `com.kaan.ble-sensors` package and its pinned Velorexe dependency. The treadmill's reported belt speed measures the user, independently of the [ghost's preset or all-time reference](ghost-comparison.md). PaceScape does not write speed, incline, start or stop commands to the physical treadmill.
 
 ## Connect
 
@@ -12,16 +12,16 @@ PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2
 
 ## Stopping and interruptions
 
-- A fresh **0 km/h** sample stops movement and sets the animation to idle immediately. It does not change the explicit run state; new positive speed resumes movement if the run is still Running.
-- Speed must have arrived within the last **two seconds**, matching the source plugin's existing freshness policy. Missing, rejected, disconnected or stale speed pauses the virtual session. Distance-only packets do not renew speed freshness. A fresh packet never automatically resumes a paused session: use **Weiterlaufen** after tracking and speed have recovered.
-- Connecting, disconnecting or selecting manual tempo pauses an active virtual run. BLE disconnection keeps the treadmill source selected, so it cannot silently fall back to the manual target. **Zurück zum manuellen Tempo** disconnects BLE and restores the saved manual target; explicitly resume or start again.
-- The manual pace slider is disabled while following the treadmill. Lane/start settings and the saved manual target remain separate from live belt speed. The overview displays the active target, not the runner's momentary smoothed speed.
-- App backgrounding disconnects BLE through the reused package. Reconnect deliberately after returning. The existing server/tracking interruption rules also continue to apply.
-- Total distance is the optional raw UINT24 device counter in metres, not a session-relative distance or a calibrated measurement. No distance integration or training evaluation was added.
+- Fresh 0 km/h is valid user standstill and contributes measurement time. It does not stop the independent ghost.
+- Missing, invalid, disconnected or stale speed breaks user measurement continuity and cannot produce PRs across the gap. It does not change ghost target pace. Distance-only packets do not renew speed freshness.
+- Connect/disconnect affects only the measurement input. The retired manual-input selection command is no longer exposed.
+- The ghost uses preset speed or the stored all-time distance record. Current-run statistics do not override its preset. Its selected speed, position and path are independent of user distance.
+- Explicit pause, tracking loss, app backgrounding and server/liveness loss still pause ghost motion. Recovery requires explicit resume. App backgrounding also disconnects the reused BLE transport.
+- Device total distance remains a separate raw counter, not the source of record calculations. See [measurement definition](ghost-comparison.md).
 
 ## Protocol
 
-Tracking-scene state advertises `treadmillControlVersion: 1` and a `treadmill` object with `supported`, `followTreadmill`, `status`, `scanning`, `busy`, `connected`, `hasTreadmillData`, `deviceId`, `deviceName`, `hasSpeed`, `speedKmh`, `hasDistance`, `totalDistanceMetres` and `devices: [{id,name}]`. Validity flags distinguish missing samples from zero. The marker-free Editor test scene does not advertise BLE support; Android BLE cannot be tested in Editor Play mode.
+Tracking-scene state advertises `treadmillControlVersion: 1` and a `treadmill` object with `supported`, `status`, `scanning`, `busy`, `connected`, `hasTreadmillData`, `deviceId`, `deviceName`, `hasSpeed`, `speedKmh`, `hasDistance`, `totalDistanceMetres` and `devices: [{id,name}]`. Validity flags distinguish missing samples from zero. The marker-free Editor test scene does not advertise BLE support; Android BLE cannot be tested in Editor Play mode.
 
 Commands use the existing acknowledged command envelope:
 
@@ -31,7 +31,6 @@ Commands use the existing acknowledged command envelope:
 | `treadmill.scan.stop` | `{}` |
 | `treadmill.connect` | `{"deviceId":"ID from the current scan"}` |
 | `treadmill.disconnect` | `{}` |
-| `treadmill.manual` | `{}` |
 
 A connection ACK accepts the asynchronous attempt. Subsequent state reports connection, FTMS discovery and fresh data; it is not proof of usable telemetry.
 

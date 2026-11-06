@@ -29,7 +29,6 @@ namespace PaceScape.Tests
             _connection = (Component)Field(_source, "_connection");
             _measurements = (Component)Field(_source, "_measurements");
             SetField(_connection, "<Connected>k__BackingField", true);
-            SetField(_source, "<FollowTreadmill>k__BackingField", true);
 
             Type channelType = BleType("BleChannel");
             object channel = Activator.CreateInstance(channelType);
@@ -53,58 +52,79 @@ namespace PaceScape.Tests
         }
 
         [Test]
-        public void BeltSpeedChangesSetRunnerPaceAndZeroStopsPhysicalMotion()
+        public void BeltReadoutsChangeWhileIndependentGhostKeepsItsConfiguredPace()
         {
             Receive(new byte[] { 0, 0, 0xE8, 3 }); // 10 km/h
-            Assert.That(Pace(), Is.EqualTo(6f));
+            Assert.That(Speed(), Is.EqualTo(10.0));
             Receive(new byte[] { 0, 0, 0xB0, 4 }); // 12 km/h
-            Assert.That(Pace(), Is.EqualTo(5f));
+            Assert.That(Speed(), Is.EqualTo(12.0));
             var runner = new GameObject("FTMS runner");
             runner.transform.SetParent(_root.transform);
             object motion = Activator.CreateInstance(RuntimeType("RunningTrack.RunningTrackMotion"), runner.transform, 1, 0.5f);
             MethodInfo advance = motion.GetType().GetMethod("Advance");
-            advance.Invoke(motion, new object[] { 1f, Pace() });
+            advance.Invoke(motion, new object[] { 1f, 6f });
             Vector3 movingPosition = runner.transform.localPosition;
             Receive(new byte[] { 0, 0, 0, 0 });
             object[] speedArguments = { 1.0 };
             Assert.That(_source.GetType().GetMethod("TryGetSpeedKmh").Invoke(_source, speedArguments), Is.True);
             Assert.That(speedArguments[0], Is.EqualTo(0.0));
-            advance.Invoke(motion, new object[] { 1f, Pace() });
-            Assert.That(runner.transform.localPosition, Is.EqualTo(movingPosition));
+            advance.Invoke(motion, new object[] { 1f, 6f });
+            Assert.That(Vector3.Distance(runner.transform.localPosition, movingPosition), Is.GreaterThan(2f));
         }
 
         [Test]
-        public void DistanceOnlyPacketDoesNotRefreshSpeedAndDisconnectNeverFallsBackToManualPace()
+        public void DistanceOnlyPacketDoesNotRefreshSpeedAndDisconnectInvalidatesMeasurement()
         {
             Receive(new byte[] { 0, 0, 0xE8, 3 });
             _channelValue.GetType().GetField("At").SetValue(_channelValue, Time.realtimeSinceStartup - 3f);
             Receive(new byte[] { 5, 0, 0xD0, 0x11, 1 }); // More Data + UINT24 distance 70096 m
-            Assert.That(Pace(), Is.Zero);
+            Assert.That(Speed(), Is.Null);
             object[] distanceArguments = { 0u };
             Assert.That(_measurements.GetType().GetMethod("TryGetTreadmillTotalDistanceMetres").Invoke(_measurements, distanceArguments), Is.True);
             Assert.That(distanceArguments[0], Is.EqualTo(70096u));
             Receive(new byte[] { 0, 0, 0xE8, 3 });
             SetField(_connection, "<Connected>k__BackingField", false);
-            Assert.That(Pace(), Is.Zero);
-            SetField(_source, "<FollowTreadmill>k__BackingField", false);
-            Assert.That(Pace(), Is.EqualTo(4f));
+            Assert.That(Speed(), Is.Null);
+
         }
 
         [Test]
-        public void MissingSignalPausesSessionAndFreshPacketsDoNotAutomaticallyResumeIt()
+        public void MissingBeltSignalDoesNotPauseTheGhost()
         {
             var trackerRoot = new GameObject("FTMS tracking gate");
             trackerRoot.SetActive(false);
             trackerRoot.transform.SetParent(_root.transform);
             Component tracker = trackerRoot.AddComponent(RuntimeType("Tracking.TagTracker"));
-            tracker.GetType().GetProperty("TreadmillSource").SetValue(tracker, _source);
             object session = Field(tracker, "_runSession");
             session.GetType().GetMethod("TryStart").Invoke(session, new object[] { true });
             tracker.GetType().GetMethod("UpdateVisuals", PrivateInstance).Invoke(tracker, null);
-            Assert.That(tracker.GetType().GetProperty("RunState").GetValue(tracker).ToString(), Is.EqualTo("Paused"));
+            Assert.That(tracker.GetType().GetProperty("RunState").GetValue(tracker).ToString(), Is.EqualTo("Running"));
             Receive(new byte[] { 0, 0, 0xE8, 3 });
             tracker.GetType().GetMethod("UpdateVisuals", PrivateInstance).Invoke(tracker, null);
-            Assert.That(tracker.GetType().GetProperty("RunState").GetValue(tracker).ToString(), Is.EqualTo("Paused"));
+            Assert.That(tracker.GetType().GetProperty("RunState").GetValue(tracker).ToString(), Is.EqualTo("Running"));
+        }
+
+        [Test]
+        public void FixedGhostIsIndependentOfBeltSpeedAndRejectsRetiredModes()
+        {
+            var trackerRoot = new GameObject("Ghost pace test");
+            trackerRoot.SetActive(false);
+            trackerRoot.transform.SetParent(_root.transform);
+            Component tracker = trackerRoot.AddComponent(RuntimeType("Tracking.TagTracker"));
+            Type type = tracker.GetType();
+            Assert.That(type.GetProperty("Mode").GetValue(tracker).ToString(), Is.EqualTo("FixedPace"));
+            Receive(new byte[] { 0, 0, 0xB0, 4 });
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(6f));
+            Receive(new byte[] { 0, 0, 0, 0 });
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(6f));
+            SetField(_connection, "<Connected>k__BackingField", false);
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(6f));
+            type.GetMethod("TrySetPace").Invoke(tracker, new object[] { 4f });
+            Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(4f));
+            foreach (string retired in new[] { "FollowInput", "TempoRunner", "SideBySide" })
+            {
+                Assert.That(type.GetMethod("TrySetRunnerMode").Invoke(tracker, new object[] { retired }), Is.False);
+            }
         }
 
         [Test]
@@ -120,9 +140,11 @@ namespace PaceScape.Tests
             Assert.That(exception.InnerException, Is.TypeOf<FormatException>());
         }
 
-        private float Pace()
+        private double? Speed()
         {
-            return (float)_source.GetType().GetMethod("GetRunnerPace").Invoke(_source, new object[] { 4f });
+            object[] arguments = { 0.0 };
+            bool valid = (bool)_source.GetType().GetMethod("TryGetSpeedKmh").Invoke(_source, arguments);
+            return valid ? (double?)arguments[0] : null;
         }
 
         private void Receive(byte[] packet)

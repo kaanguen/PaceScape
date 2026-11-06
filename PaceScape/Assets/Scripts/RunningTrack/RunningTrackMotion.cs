@@ -24,6 +24,12 @@ namespace PaceScape.RunningTrack
         private bool _hasAdvanced;
         private double _speed;
         private double _distance;
+        private readonly Renderer[] _renderers;
+        private readonly bool[] _rendererVisibility;
+        private bool _hasRelativePose;
+
+        /// <summary>Gets unwrapped travel from the configured start, excluding the start offset.</summary>
+        public double TravelledMetres { get; private set; }
 
         /// <summary>Places the object behind the shared start line, preserving its grounded height and scale.</summary>
         public RunningTrackMotion(Transform target, int lane, float distanceBehindStartLine)
@@ -50,6 +56,12 @@ namespace PaceScape.RunningTrack
             }
 
             _target = target;
+            _renderers = target.GetComponentsInChildren<Renderer>(true);
+            _rendererVisibility = new bool[_renderers.Length];
+            for (int i = 0; i < _renderers.Length; i++)
+            {
+                _rendererVisibility[i] = _renderers[i].enabled;
+            }
             _animator = target.GetComponentInChildren<Animator>(true);
             _groundOffset = target.localPosition.y;
             ConfigureStart(lane, distanceBehindStartLine);
@@ -72,6 +84,9 @@ namespace PaceScape.RunningTrack
         /// <summary>Returns to the configured start without moving the anchor or track.</summary>
         public void ResetToStart()
         {
+            TravelledMetres = 0;
+            _hasAdvanced = false;
+            _speed = 0;
             _distance = -_distanceBehindStartLine % RunningTrackGeometry.GetLaneLength(_lane);
             ApplyPose();
         }
@@ -110,8 +125,63 @@ namespace PaceScape.RunningTrack
             double travel = targetSpeed * deltaTime + difference * SpeedTransitionSeconds * (1.0 - decay);
             _speed = targetSpeed + difference * decay;
             UpdateAnimation((float)Math.Min(_speed, float.MaxValue));
+            TravelledMetres += travel;
             _distance = (_distance + travel) % RunningTrackGeometry.GetLaneLength(_lane);
             ApplyPose();
+        }
+
+        /// <summary>Uses exact recorded travel while smoothing only the visual gait response.</summary>
+        public void AdvanceRecorded(float deltaTime, double travelMetres, double endSpeedMetresPerSecond)
+        {
+            if (!IsFinite(deltaTime) || deltaTime <= 0 || double.IsNaN(travelMetres) ||
+                double.IsInfinity(travelMetres) || travelMetres < 0 || double.IsNaN(endSpeedMetresPerSecond) ||
+                double.IsInfinity(endSpeedMetresPerSecond) || endSpeedMetresPerSecond < 0)
+            {
+                return;
+            }
+            if (_target == null)
+            {
+                throw new InvalidOperationException("The runner object was removed.");
+            }
+            _speed = _hasAdvanced ? endSpeedMetresPerSecond + (_speed - endSpeedMetresPerSecond) *
+                Math.Exp(-deltaTime / SpeedTransitionSeconds) : endSpeedMetresPerSecond;
+            _hasAdvanced = true;
+            UpdateAnimation((float)Math.Min(_speed, float.MaxValue));
+            TravelledMetres += travelMetres;
+            _distance = (_distance + travelMetres) % RunningTrackGeometry.GetLaneLength(_lane);
+            ApplyPose();
+        }
+
+        /// <summary>Overrides only visible placement; logical lane travel and gait speed stay independent.</summary>
+        public void SetPresentationPose(Pose localFloorPose, bool visible)
+        {
+            _hasRelativePose = true;
+            _target.SetLocalPositionAndRotation(localFloorPose.position + Vector3.up * _groundOffset,
+                localFloorPose.rotation);
+            SetRendererVisibility(visible);
+        }
+
+        /// <summary>Restores the selected lane at its current logical progress, including initial renderer flags.</summary>
+        public void ClearPresentationPose()
+        {
+            if (!_hasRelativePose)
+            {
+                return;
+            }
+            _hasRelativePose = false;
+            SetRendererVisibility(true);
+            ApplyPose();
+        }
+
+        private void SetRendererVisibility(bool visible)
+        {
+            for (int i = 0; i < _renderers.Length; i++)
+            {
+                if (_renderers[i] != null)
+                {
+                    _renderers[i].enabled = visible && _rendererVisibility[i];
+                }
+            }
         }
 
         private static bool IsFinite(float value)
@@ -195,6 +265,10 @@ namespace PaceScape.RunningTrack
 
         private void ApplyPose()
         {
+            if (_hasRelativePose)
+            {
+                return;
+            }
             Pose pose = RunningTrackGeometry.EvaluateLane(_lane, _distance);
             _target.SetLocalPositionAndRotation(pose.position + Vector3.up * _groundOffset, pose.rotation);
         }

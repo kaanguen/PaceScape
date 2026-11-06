@@ -122,6 +122,27 @@ namespace PaceScape.Tests
             Assert.That(_markers, Is.Empty);
         }
 
+        [Test]
+        public void ModeSwitchPausesWithoutRewindingAndResetRetainsTheMode()
+        {
+            SessionCall("TryStart", true);
+            Advance();
+            Vector3 before = _runner.transform.localPosition;
+            Assert.That(TrackerCall("TrySetRunnerMode", "AllTimePersonalBest"), Is.True);
+            Assert.That(Property("RunState").ToString(), Is.EqualTo("Paused"));
+            Assert.That(Property("Mode").ToString(), Is.EqualTo("AllTimePersonalBest"));
+            Assert.That(_runner.transform.localPosition, Is.EqualTo(before));
+            Assert.That(SessionCall("TryResume", true), Is.True);
+            Assert.That(TrackerCall("TrySetRunnerMode", "AllTimePersonalBest"), Is.True);
+            Assert.That(Property("RunState").ToString(), Is.EqualTo("Running"));
+            Assert.That(TrackerCall("TrySetRunnerMode", "GhostRunner"), Is.False);
+            Assert.That(TrackerCall("TrySetRunnerMode", "1"), Is.False);
+            Assert.That(Property("RunState").ToString(), Is.EqualTo("Running"));
+            _tracker.GetType().GetMethod("ResetRun").Invoke(_tracker, null);
+            Assert.That(Property("Mode").ToString(), Is.EqualTo("AllTimePersonalBest"));
+            Assert.That(Property("RunState").ToString(), Is.EqualTo("Ready"));
+        }
+
         private void Advance()
         {
             _session.GetType().GetMethod("Advance").Invoke(_session, new object[] { _motion, 1f, 6f });
