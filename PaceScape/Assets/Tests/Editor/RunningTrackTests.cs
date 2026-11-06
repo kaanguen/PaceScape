@@ -18,6 +18,31 @@ namespace PaceScape.Tests
         }
 
         [Test]
+        public void RecordedMotionUsesExactTravelAndResetClearsUnwrappedProgress()
+        {
+            var root = new GameObject("Recorded motion test");
+            try
+            {
+                Type motionType = Type.GetType("PaceScape.RunningTrack.RunningTrackMotion, Assembly-CSharp", true);
+                object motion = Activator.CreateInstance(motionType, root.transform, 1, 0f);
+                MethodInfo advance = motionType.GetMethod("AdvanceRecorded");
+                advance.Invoke(motion, new object[] { 0.1f, 10.0, 10.0 });
+                advance.Invoke(motion, new object[] { 0.1f, 1.0, 1.0 });
+                Pose expected = (Pose)_geometryType.GetMethod("EvaluateLane").Invoke(null, new object[] { 1, 11.0 });
+                Assert.That(Vector3.Distance(root.transform.localPosition, expected.position), Is.LessThan(0.0001f));
+                Assert.That(motionType.GetProperty("TravelledMetres").GetValue(motion), Is.EqualTo(11.0));
+                advance.Invoke(motion, new object[] { 0.1f, 0.0, 0.0 });
+                Assert.That(motionType.GetProperty("TravelledMetres").GetValue(motion), Is.EqualTo(11.0));
+                motionType.GetMethod("ResetToStart").Invoke(motion, null);
+                Assert.That(motionType.GetProperty("TravelledMetres").GetValue(motion), Is.EqualTo(0.0));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void MarkerIsOnLaneOneAndFacesAlongInitialStraight()
         {
             Assert.That(Evaluate(0f).magnitude, Is.LessThan(0.0001f));
@@ -217,6 +242,18 @@ namespace PaceScape.Tests
                     Assert.That(animator.GetFloat("Speed") * animator.GetFloat("PlaybackRate"),
                         Is.EqualTo(1000f / (pace * 60f)).Within(0.03f));
                     Assert.That(hasAnimatedLeg, Is.True, "The runner must animate while following the lane.");
+                    if (pace == 12f)
+                    {
+                        bool hasEarlyJogContribution = false;
+                        foreach (AnimatorClipInfo clip in animator.GetCurrentAnimatorClipInfo(0))
+                        {
+                            hasEarlyJogContribution |= (clip.clip.name == "runninig" || clip.clip.name == "running") &&
+                                clip.weight > 0.001f;
+                        }
+
+                        Assert.That(hasEarlyJogContribution, Is.True, "Slow movement should already include a small jog blend.");
+                    }
+
                     float nativeSpeed = 0f;
                     foreach (AnimatorClipInfo clip in animator.GetCurrentAnimatorClipInfo(0))
                     {

@@ -1,0 +1,24 @@
+.ghost-preview {
+    padding: 8px;
+}
+.ghost-preview-status {
+    margin-top: 8px;
+    margin-bottom: 8px;
+    white-space: normal;
+    -unity-font-style: bold;
+}
+.ghost-preview-controls {
+    flex-direction: row;
+    margin-bottom: 8px;
+}
+.ghost-preview-controls > Button {
+    flex-grow: 1;
+}
+.ghost-preview-image {
+    flex-grow: 1;
+    min-height: 180px;
+    margin-bottom: 8px;
+}
+.ghost-preview > Label {
+    white-space: normal;
+}

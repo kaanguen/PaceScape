@@ -17,6 +17,17 @@
       },
       "hash": "81542a7e86292b5c4c21b1782c5af23b567f45ce"
     },
+    "com.kaan.ble-sensors": {
+      "version": "file:com.kaan.ble-sensors",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.velorexe.androidbluetoothlowenergy": "0.0.6",
+        "com.unity.textmeshpro": "3.0.7",
+        "com.unity.ugui": "1.0.0",
+        "com.unity.modules.androidjni": "1.0.0"
+      }
+    },
     "com.magicleap.setuptool": {
       "version": "file:com.magicleap.setuptool",
       "depth": 0,
@@ -374,6 +385,17 @@
         "com.unity.xr.legacyinputhelpers": "2.1.2"
       },
       "url": "https://packages.unity.com"
+    },
+    "com.velorexe.androidbluetoothlowenergy": {
+      "version": "https://github.com/Velorexe/Unity-Android-Bluetooth-Low-Energy.git#55d8c12e155cc45bc26cea120d5e8c1e5f231b9f",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.mobile.android-logcat": "1.2.3",
+        "com.unity.ugui": "1.0.0",
+        "com.unity.modules.androidjni": "^1.0.0"
+      },
+      "hash": "55d8c12e155cc45bc26cea120d5e8c1e5f231b9f"
     },
     "com.unity.modules.ai": {
       "version": "1.0.0",
