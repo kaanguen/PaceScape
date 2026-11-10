@@ -9,18 +9,27 @@ namespace PaceScape.RunningTrack
         private static readonly int _speedParameter = Animator.StringToHash("Speed");
         private static readonly int _playbackRateParameter = Animator.StringToHash("PlaybackRate");
         private const double SpeedTransitionSeconds = 0.35;
+        private const float JogBlendStartFactor = 0.85f;
         private readonly Transform _target;
         private readonly Animator _animator;
-        private readonly int _lane;
+        private int _lane;
+        private float _distanceBehindStartLine;
         private readonly float _groundOffset;
         private bool _hasCheckedAnimationParameters;
         private bool _hasSpeedParameter;
         private bool _hasPlaybackRate;
         private float _walkSpeed;
+        private float _runSpeed;
         private float _sprintSpeed;
         private bool _hasAdvanced;
         private double _speed;
         private double _distance;
+        private readonly Renderer[] _renderers;
+        private readonly bool[] _rendererVisibility;
+        private bool _hasRelativePose;
+
+        /// <summary>Gets unwrapped travel from the configured start, excluding the start offset.</summary>
+        public double TravelledMetres { get; private set; }
 
         /// <summary>Places the object behind the shared start line, preserving its grounded height and scale.</summary>
         public RunningTrackMotion(Transform target, int lane, float distanceBehindStartLine)
@@ -47,10 +56,38 @@ namespace PaceScape.RunningTrack
             }
 
             _target = target;
+            _renderers = target.GetComponentsInChildren<Renderer>(true);
+            _rendererVisibility = new bool[_renderers.Length];
+            for (int i = 0; i < _renderers.Length; i++)
+            {
+                _rendererVisibility[i] = _renderers[i].enabled;
+            }
             _animator = target.GetComponentInChildren<Animator>(true);
-            _lane = lane;
             _groundOffset = target.localPosition.y;
-            _distance = -distanceBehindStartLine % RunningTrackGeometry.GetLaneLength(lane);
+            ConfigureStart(lane, distanceBehindStartLine);
+        }
+
+        /// <summary>Repositions on the requested lane at the start offset while preserving grounded height.</summary>
+        public void ConfigureStart(int lane, float distanceBehindStartLine)
+        {
+            if (lane < 1 || lane > RunningTrackGeometry.LaneCount || !IsFinite(distanceBehindStartLine) ||
+                distanceBehindStartLine < 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(distanceBehindStartLine));
+            }
+
+            _lane = lane;
+            _distanceBehindStartLine = distanceBehindStartLine;
+            ResetToStart();
+        }
+
+        /// <summary>Returns to the configured start without moving the anchor or track.</summary>
+        public void ResetToStart()
+        {
+            TravelledMetres = 0;
+            _hasAdvanced = false;
+            _speed = 0;
+            _distance = -_distanceBehindStartLine % RunningTrackGeometry.GetLaneLength(_lane);
             ApplyPose();
         }
 
@@ -88,8 +125,63 @@ namespace PaceScape.RunningTrack
             double travel = targetSpeed * deltaTime + difference * SpeedTransitionSeconds * (1.0 - decay);
             _speed = targetSpeed + difference * decay;
             UpdateAnimation((float)Math.Min(_speed, float.MaxValue));
+            TravelledMetres += travel;
             _distance = (_distance + travel) % RunningTrackGeometry.GetLaneLength(_lane);
             ApplyPose();
+        }
+
+        /// <summary>Uses exact recorded travel while smoothing only the visual gait response.</summary>
+        public void AdvanceRecorded(float deltaTime, double travelMetres, double endSpeedMetresPerSecond)
+        {
+            if (!IsFinite(deltaTime) || deltaTime <= 0 || double.IsNaN(travelMetres) ||
+                double.IsInfinity(travelMetres) || travelMetres < 0 || double.IsNaN(endSpeedMetresPerSecond) ||
+                double.IsInfinity(endSpeedMetresPerSecond) || endSpeedMetresPerSecond < 0)
+            {
+                return;
+            }
+            if (_target == null)
+            {
+                throw new InvalidOperationException("The runner object was removed.");
+            }
+            _speed = _hasAdvanced ? endSpeedMetresPerSecond + (_speed - endSpeedMetresPerSecond) *
+                Math.Exp(-deltaTime / SpeedTransitionSeconds) : endSpeedMetresPerSecond;
+            _hasAdvanced = true;
+            UpdateAnimation((float)Math.Min(_speed, float.MaxValue));
+            TravelledMetres += travelMetres;
+            _distance = (_distance + travelMetres) % RunningTrackGeometry.GetLaneLength(_lane);
+            ApplyPose();
+        }
+
+        /// <summary>Overrides only visible placement; logical lane travel and gait speed stay independent.</summary>
+        public void SetPresentationPose(Pose localFloorPose, bool visible)
+        {
+            _hasRelativePose = true;
+            _target.SetLocalPositionAndRotation(localFloorPose.position + Vector3.up * _groundOffset,
+                localFloorPose.rotation);
+            SetRendererVisibility(visible);
+        }
+
+        /// <summary>Restores the selected lane at its current logical progress, including initial renderer flags.</summary>
+        public void ClearPresentationPose()
+        {
+            if (!_hasRelativePose)
+            {
+                return;
+            }
+            _hasRelativePose = false;
+            SetRendererVisibility(true);
+            ApplyPose();
+        }
+
+        private void SetRendererVisibility(bool visible)
+        {
+            for (int i = 0; i < _renderers.Length; i++)
+            {
+                if (_renderers[i] != null)
+                {
+                    _renderers[i].enabled = visible && _rendererVisibility[i];
+                }
+            }
         }
 
         private static bool IsFinite(float value)
@@ -129,6 +221,10 @@ namespace PaceScape.RunningTrack
                         {
                             _walkSpeed = nativeSpeed;
                         }
+                        else if (clip.name == "runninig" || clip.name == "running")
+                        {
+                            _runSpeed = nativeSpeed;
+                        }
                         else if (clip.name == "sprint")
                         {
                             _sprintSpeed = nativeSpeed;
@@ -148,6 +244,14 @@ namespace PaceScape.RunningTrack
                 {
                     // Native root velocities calibrate cadence; only the track owns world displacement.
                     blendSpeed = Mathf.Clamp(speed, _walkSpeed, _sprintSpeed);
+                    if (_runSpeed > _walkSpeed && speed < _runSpeed)
+                    {
+                        // Introduce a small jog contribution earlier without changing path speed.
+                        float jogWeight = Mathf.InverseLerp(_walkSpeed * JogBlendStartFactor, _runSpeed, speed);
+                        blendSpeed = Mathf.Lerp(_walkSpeed, _runSpeed, jogWeight);
+                    }
+
+                    // Compensate for the blended clip's native velocity, including the early jog mixture.
                     playbackRate = speed / blendSpeed;
                 }
 
@@ -161,6 +265,10 @@ namespace PaceScape.RunningTrack
 
         private void ApplyPose()
         {
+            if (_hasRelativePose)
+            {
+                return;
+            }
             Pose pose = RunningTrackGeometry.EvaluateLane(_lane, _distance);
             _target.SetLocalPositionAndRotation(pose.position + Vector3.up * _groundOffset, pose.rotation);
         }

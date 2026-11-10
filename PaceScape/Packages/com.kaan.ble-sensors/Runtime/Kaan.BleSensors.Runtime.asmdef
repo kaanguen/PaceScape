@@ -1,0 +1,9 @@
+{
+  "name": "Kaan.BleSensors.Runtime",
+  "references": [
+    "com.velorexe.androidbluetoothlowenergy.runtime",
+    "Unity.TextMeshPro",
+    "UnityEngine.UI"
+  ],
+  "autoReferenced": true
+}

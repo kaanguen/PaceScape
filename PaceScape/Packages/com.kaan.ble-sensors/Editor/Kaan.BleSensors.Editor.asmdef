@@ -1,0 +1,10 @@
+{
+  "name": "Kaan.BleSensors.Editor",
+  "references": [
+    "Kaan.BleSensors.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}
