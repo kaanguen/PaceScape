@@ -28,9 +28,11 @@ namespace PaceScape.RemoteControl
     {
         // Sentinels ensure omitted numeric members fail validation instead of silently becoming zero.
         public string deviceId;
+        public int targetSpeedUnits;
         public string runnerMode;
         public string presentationMode;
-        public float sideOffsetMetres = float.NaN;
+        // Zero is outside the allowed offset range and stays valid JSON when Unity serializes an empty payload.
+        public float sideOffsetMetres;
         public float visibilityDistanceMetres = -1;
         public float comparisonDistanceMetres = -1;
         public bool useDemoRecords;
@@ -50,6 +52,9 @@ namespace PaceScape.RemoteControl
     internal sealed class RemoteState
     {
         public string deviceName;
+        public bool lanMotorControlEnabled;
+        public int cameraControlVersion;
+        public RemoteCameraState camera;
         public int treadmillControlVersion;
         public TreadmillState treadmill;
         public bool isEditor;

@@ -1,6 +1,6 @@
 # Domyos / FTMS treadmill input
 
-PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2ACD`) on Magic Leap 2 through the user's embedded `com.kaan.ble-sensors` package and its pinned Velorexe dependency. The treadmill's reported belt speed measures the user, independently of the [ghost's preset or all-time reference](ghost-comparison.md). PaceScape does not write speed, incline, start or stop commands to the physical treadmill.
+PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2ACD`) on Magic Leap 2 through the user's embedded `com.kaan.ble-sensors` package and its pinned Velorexe dependency. The treadmill's reported belt speed measures the user, independently of the [ghost's preset or all-time reference](ghost-comparison.md). Motor control is opt-in and available from the local dashboard over USB or WLAN.
 
 ## Connect
 
@@ -8,7 +8,35 @@ PaceScape reads Bluetooth FTMS Treadmill Data (service `1826`, characteristic `2
 2. Build and install the updated Android app. The existing tracking scene needs no serialized changes: its remote-control client creates the BLE input at runtime. Start the updated separate server in `/Users/kaan/Work/PaceScapeControl` with `npm start`, then open its dashboard. Restart an already-running server after updating it.
 3. Enable Bluetooth on the headset. On Android 11 and earlier, enable location services as required by Android BLE scanning. Put the treadmill in its Bluetooth advertising mode and disconnect other fitness apps using it.
 4. In **Laufband verbinden**, choose **Bluetooth-Geräte suchen**. Grant the requested permissions on the headset, select the treadmill by its name and ID, then choose **Laufband verbinden**. The scan is performed on the headset, not in the browser. All advertised BLE devices can appear; offering FTMS Treadmill Data determines compatibility.
-5. Wait for **Gemeldete Geschwindigkeit**, place and track the runner as usual, then choose **Lauf starten**. Changing speed on the physical treadmill updates the virtual runner. The existing 0.35 s speed response also adjusts animation. This is belt telemetry, not a measurement of the runner's actual body speed or stride.
+5. Wait for **Gemeldete Geschwindigkeit**, place and track the runner as usual, then choose **Lauf starten**. Changes to belt speed update the user's measurements. The ghost follows its selected pace reference.
+
+The Bluetooth panel also reports whether the connected device exposes the FTMS Fitness Machine Control Point (`1826/2AD9`). Discovery is passive. It does not request control or verify that the device accepts a remote start.
+
+## Optional USB motor start
+
+Use a new app build with `ServerUrl` set to `ws://127.0.0.1:8787/ws`. Keep the normal USB port forwarding. From the server project, start:
+
+```sh
+HOST=127.0.0.1 PACESCAPE_MOTOR_START=1 npm start
+```
+
+Open the dashboard from the same Mac at `http://127.0.0.1:8787`.
+
+On the dashboard main page, **Lauf starten** starts both the ghost session and a stationary treadmill in USB motor mode. It requires a tracked placement and fresh 0 km/h telemetry. After browser confirmation, the headset requests control and sends FTMS Start or Resume. The ghost starts after the device confirms. If the belt is already moving, **Lauf starten** starts the ghost session directly. Initial belt speed is controlled by the treadmill.
+
+The **Laufbandgeschwindigkeit** slider uses the device's Supported Speed Range (`2AD4`) and is enabled while the belt is moving. Load the range explicitly with **Tempobereich laden** while the belt is stopped. Normal connection and telemetry do not perform this optional read. The RUN500 log showed a failed native read and Bluetooth timeout, so a failed range request can still drop the connection. **Tempo übernehmen** sends the selected FTMS Set Target Speed value after confirmation. The displayed measured speed still comes from belt telemetry. Missing responses are inconclusive and commands are never retried automatically. In USB motor mode, **Lauf pausieren** sends FTMS Pause and freezes the ghost after acknowledgement. **Lauf fortsetzen** sends Start or Resume when the belt reports 0 km/h and resumes the ghost after acknowledgement. **Lauf beenden** resets the ghost session immediately when the headset receives the command and requests FTMS Stop separately. The dashboard confirms motor stop only after acknowledgement. Pause and stop are available with a connected control point even if belt speed telemetry is stale. If the device rejects the operation or the response is missing, check the console and use the treadmill controls or physical safety stop.
+
+## Optional WLAN motor control
+
+Under **PaceScape > Serververbindung**, enter the Mac's IPv4 address in the WebSocket URL and enable **Laufbandsteuerung im WLAN erlauben**. Save and use a new headset build. If the headset uses a connection override, it can set `AllowLanMotorControl` and `ServerUrl` in `pacescape-control.json`.
+
+Start the server in the separate server project:
+
+```sh
+HOST=0.0.0.0 PACESCAPE_WLAN_MOTOR_START=1 npm start
+```
+
+Open the dashboard on the server Mac at `http://127.0.0.1:8787`. The headset can use `ws://<Mac-IP>:8787/ws` over WLAN without USB or a shared key. Plain WebSocket traffic is unencrypted. Enable this mode only on a trusted local network. Dashboards opened on other devices retain telemetry and ghost control. Domyos RUN500 control-point discovery was reported, but acceptance of the start command has not been verified on hardware.
 
 ## Stopping and interruptions
 
@@ -32,7 +60,7 @@ Commands use the existing acknowledged command envelope:
 | `treadmill.connect` | `{"deviceId":"ID from the current scan"}` |
 | `treadmill.disconnect` | `{}` |
 
-A connection ACK accepts the asynchronous attempt. Subsequent state reports connection, FTMS discovery and fresh data; it is not proof of usable telemetry.
+A connection ACK accepts the asynchronous attempt. Subsequent state reports connection, FTMS discovery and fresh data. The additive `treadmill.hasFtmsControlPoint` flag reports discovery of the control characteristic only.
 
 ## Sources and package provenance
 

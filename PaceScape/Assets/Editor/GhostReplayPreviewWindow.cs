@@ -93,11 +93,10 @@ namespace PaceScape.Editor
             };
             speed.RegisterValueChangedCallback(evt => _simulatedUserSpeedKmh = evt.newValue);
             rootVisualElement.Add(speed);
-            var side = new FloatField("Seitlicher Abstand (m)") { value = 1.5f };
             var range = new FloatField("Sichtdistanz vor/hinter dir (m)") { value = 10f };
             Action configureRelative = () =>
             {
-                if (_relativePresentation.TryConfigure("TreadmillRelative", side.value, range.value))
+                if (_relativePresentation.TryConfigure("TreadmillRelative", _relativePresentation.SideOffsetMetres, range.value))
                 {
                     ApplyRelativePose();
                     UpdateStatus();
@@ -106,12 +105,10 @@ namespace PaceScape.Editor
                 }
                 else
                 {
-                    ShowError("Seitlicher Abstand: ±0,5–5 m. Sichtdistanz: 1–100 m.");
+                    ShowError("Sichtdistanz: 1–100 m.");
                 }
             };
-            side.RegisterValueChangedCallback(evt => configureRelative());
             range.RegisterValueChangedCallback(evt => configureRelative());
-            rootVisualElement.Add(side);
             rootVisualElement.Add(range);
             _relativePresentation.TryConfigure("TreadmillRelative", 1.5f, 10f);
             var overview = new Toggle("Übersicht statt Blick vom Laufband") { value = _overview };
@@ -311,7 +308,7 @@ namespace PaceScape.Editor
             _userMarker.SetActive(_relativeView && _overview);
             if (_relativeView)
             {
-                bool visible = _relativePresentation.Evaluate(Pose.identity,
+                bool visible = _relativePresentation.Evaluate(1, Vector3.zero,
                     _replay.DistanceMetres - _simulatedUserDistance - 0.5, out Pose pose);
                 _motion.SetPresentationPose(pose, visible);
             }

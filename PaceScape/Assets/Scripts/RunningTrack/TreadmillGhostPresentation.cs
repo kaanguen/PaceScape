@@ -3,12 +3,12 @@ using UnityEngine;
 
 namespace PaceScape.RunningTrack
 {
-    /// <summary>Maps a signed progress gap into a calibrated floor frame without changing ghost speed.</summary>
+    /// <summary>Maps a signed progress gap along a selected lane without changing ghost speed.</summary>
     public sealed class TreadmillGhostPresentation
     {
         /// <summary>Gets whether the operator selected treadmill-relative presentation.</summary>
         public bool Enabled { get; private set; }
-        /// <summary>Gets signed lateral separation: positive is right, negative is left.</summary>
+        /// <summary>Gets the legacy lateral setting retained for protocol compatibility.</summary>
         public float SideOffsetMetres { get; private set; } = 1.5f;
         /// <summary>Gets the maximum visible longitudinal gap in either direction.</summary>
         public float VisibilityDistanceMetres { get; private set; } = 10f;
@@ -28,36 +28,30 @@ namespace PaceScape.RunningTrack
             return true;
         }
 
-        /// <summary>Locks a floor origin and heading from a deliberate calibration, ignoring head height and pitch.</summary>
-        public static bool TryCalibrate(Vector3 localHeadPosition, Vector3 localHeadForward, out Pose origin)
+        /// <summary>Locks the anchor-local floor point beneath the head at calibration.</summary>
+        public static bool TryCalibrate(Vector3 localHeadPosition, out Vector3 origin)
         {
-            origin = Pose.identity;
-            if (!Finite(localHeadPosition.x) || !Finite(localHeadPosition.y) || !Finite(localHeadPosition.z) ||
-                !Finite(localHeadForward.x) || !Finite(localHeadForward.y) || !Finite(localHeadForward.z))
+            origin = Vector3.zero;
+            if (!Finite(localHeadPosition.x) || !Finite(localHeadPosition.y) || !Finite(localHeadPosition.z))
             {
                 return false;
             }
-            Vector3 forward = Vector3.ProjectOnPlane(localHeadForward, Vector3.up);
-            if (forward.sqrMagnitude < 0.01f)
-            {
-                return false;
-            }
-            origin = new Pose(new Vector3(localHeadPosition.x, 0, localHeadPosition.z),
-                Quaternion.LookRotation(forward.normalized, Vector3.up));
+            origin = new Vector3(localHeadPosition.x, 0, localHeadPosition.z);
             return true;
         }
 
         /// <summary>Returns true only for a finite, in-range gap. Positive gap places the ghost ahead.</summary>
-        public bool Evaluate(Pose origin, double ghostGapMetres, out Pose pose)
+        public bool Evaluate(int lane, Vector3 origin, double ghostGapMetres, out Pose pose)
         {
-            pose = origin;
+            pose = Pose.identity;
             if (double.IsNaN(ghostGapMetres) || double.IsInfinity(ghostGapMetres))
             {
                 return false;
             }
             // Hidden poses are bounded too, so very long sessions cannot move a renderer arbitrarily far away.
             float gap = (float)Math.Max(-VisibilityDistanceMetres, Math.Min(VisibilityDistanceMetres, ghostGapMetres));
-            pose = new Pose(origin.position + origin.rotation * new Vector3(SideOffsetMetres, 0, gap), origin.rotation);
+            double referenceMetres = RunningTrackGeometry.FindNearestLaneMetres(lane, origin);
+            pose = RunningTrackGeometry.EvaluateLane(lane, referenceMetres + gap);
             return Math.Abs(ghostGapMetres) <= VisibilityDistanceMetres;
         }
 

@@ -100,6 +100,25 @@ namespace PaceScape.Tests
         }
 
         [Test]
+        public void ResetImmediatelyRestoresTheCalibratedLaneStart()
+        {
+            object visual = _markers[1UL];
+            Type visualType = visual.GetType();
+            visualType.GetField("HasGhostCalibration").SetValue(visual, true);
+            visualType.GetField("GhostOrigin").SetValue(visual, new Vector3(0, 0, 4));
+            Assert.That(TrackerCall("TryConfigureGhostPresentation", "TreadmillRelative", 1.5f, 10f), Is.True);
+            Vector3 start = _runner.transform.localPosition;
+
+            SessionCall("TryStart", true);
+            _motion.GetType().GetMethod("SetPresentationPose").Invoke(_motion,
+                new object[] { new Pose(new Vector3(1, 0, 9), Quaternion.identity), true });
+            _tracker.GetType().GetMethod("ResetRun").Invoke(_tracker, null);
+
+            Assert.That(Property("RunState").ToString(), Is.EqualTo("Ready"));
+            Assert.That(_runner.transform.localPosition, Is.EqualTo(start));
+        }
+
+        [Test]
         public void HidingContentPausesAndReadinessCannotBeBypassedByRemoteStartOrResume()
         {
             SessionCall("TryStart", true);

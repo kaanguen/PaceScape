@@ -16,6 +16,7 @@ namespace PaceScape.RunningTrack
 
         // Match MarkerML2's oval entry, ten nominal metres before the right bend.
         private const double EntryMetres = 390.0 * LapLength / 400.0;
+        private const double EntryToBend = LapLength - EntryMetres;
 
         /// <summary>Samples the oval in metres; local zero is the marker and local +Z is the initial run direction.</summary>
         public static Vector3 Evaluate(double metres, float outwardOffset = 0f)
@@ -33,6 +34,36 @@ namespace PaceScape.RunningTrack
         public static Pose EvaluateLane(int lane, double metres)
         {
             return EvaluatePath(metres, GetLaneRadius(lane), 0f);
+        }
+
+        /// <summary>Finds the nearest lane centerline coordinate to an anchor-local floor point.</summary>
+        public static double FindNearestLaneMetres(int lane, Vector3 point)
+        {
+            double radius = GetLaneRadius(lane);
+            double halfStraight = StraightLength / 2;
+            double bend = Math.PI * radius;
+            double x = point.z + halfStraight - EntryToBend;
+            double z = -point.x - Radius;
+            double distance;
+            if (x > halfStraight)
+            {
+                distance = (Math.Atan2(z, x - halfStraight) + Math.PI / 2) * radius;
+            }
+            else if (x < -halfStraight)
+            {
+                double angle = Math.Atan2(z, x + halfStraight);
+                if (angle < 0)
+                {
+                    angle += 2 * Math.PI;
+                }
+                distance = bend + StraightLength + (angle - Math.PI / 2) * radius;
+            }
+            else
+            {
+                distance = z > 0 ? bend + halfStraight - x : 2 * bend + StraightLength + x + halfStraight;
+            }
+
+            return distance - (2 * bend + 2 * StraightLength - EntryToBend);
         }
 
         private static double GetLaneRadius(int lane)
@@ -54,7 +85,7 @@ namespace PaceScape.RunningTrack
             }
 
             double length = 2 * StraightLength + 2 * Math.PI * pathRadius;
-            double entry = length - (LapLength - EntryMetres);
+            double entry = length - EntryToBend;
             double distance = ((entry + metres) % length + length) % length;
             double halfStraight = StraightLength / 2;
             double bend = Math.PI * pathRadius;
