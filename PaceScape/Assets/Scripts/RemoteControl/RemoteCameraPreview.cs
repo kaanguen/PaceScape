@@ -16,7 +16,6 @@ namespace PaceScape.RemoteControl
         private const int CaptureWidth = 960;
         private const int CaptureHeight = 720;
         private const MLCamera.CaptureFrameRate CaptureRate = MLCamera.CaptureFrameRate._30FPS;
-        private const int PreviewIntervalMilliseconds = 100;
         private const int PreviewJpegQuality = 60;
         private const int MaxFrameBytes = 2 * 1024 * 1024;
         private CancellationTokenSource _cancellation;
@@ -151,18 +150,20 @@ namespace PaceScape.RemoteControl
                 rgba = new byte[CaptureWidth * CaptureHeight * 4];
                 while (!token.IsCancellationRequested)
                 {
-                    Task nextSample = Task.Delay(PreviewIntervalMilliseconds, token);
                     var frame = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                     Interlocked.Exchange(ref nextFrame, frame);
-                    if (await Task.WhenAny(frame.Task, Task.Delay(4000, token)) != frame.Task)
+                    byte[] jpeg = await Task.Run(async () =>
                     {
-                        token.ThrowIfCancellationRequested();
-                        throw new InvalidOperationException("Kein Bild von der Brillenkamera empfangen.");
-                    }
+                        if (await Task.WhenAny(frame.Task, Task.Delay(4000, token)).ConfigureAwait(false) != frame.Task)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            throw new InvalidOperationException("Kein Bild von der Brillenkamera empfangen.");
+                        }
 
-                    token.ThrowIfCancellationRequested();
-                    await frame.Task;
-                    byte[] jpeg = await Task.Run(() => EncodeFrame(rgba), token);
+                        await frame.Task.ConfigureAwait(false);
+                        token.ThrowIfCancellationRequested();
+                        return EncodeFrame(rgba);
+                    }, token);
                     token.ThrowIfCancellationRequested();
                     if (jpeg == null || jpeg.Length < 4 || jpeg.Length > MaxFrameBytes ||
                         jpeg[0] != 0xff || jpeg[1] != 0xd8 || jpeg[jpeg.Length - 2] != 0xff || jpeg[jpeg.Length - 1] != 0xd9)
@@ -172,7 +173,6 @@ namespace PaceScape.RemoteControl
 
                     _status = "Streaming";
                     publish(jpeg);
-                    await nextSample;
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)

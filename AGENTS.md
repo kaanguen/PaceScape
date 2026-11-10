@@ -91,7 +91,7 @@ The avatar is a ghost with exactly two references: `RunningSession.RunnerMode.Fi
 
 ## Dashboard camera preview
 
-`Assets/Scripts/RemoteControl/RemoteCameraPreview.cs` opens the Magic Leap Main Camera only after `camera.start` and Android camera permission. It captures 960×720 mixed-reality RGBA video and encodes sampled frames as JPEG (quality 60) on a worker thread using a reusable RGBA buffer, and sends them over the existing WebSocket at up to 10 frames per second. The app keeps only the latest frame, stops on explicit stop, app pause or server connection loss, and does not resume automatically. Hardware capture and coexistence with marker tracking remain unverified.
+`Assets/Scripts/RemoteControl/RemoteCameraPreview.cs` opens the Magic Leap Main Camera only after `camera.start` and Android camera permission. It captures 960×720 mixed-reality RGBA video and encodes sampled frames as JPEG (quality 60) on a worker thread using a reusable RGBA buffer, and sends them over the existing WebSocket at up to the camera’s 30 frames per second. A new camera frame wakes the sender immediately. The app keeps only the latest frame, stops on explicit stop, app pause or server connection loss, and does not resume automatically. Hardware capture and coexistence with marker tracking remain unverified.
 
 ## Editor ghost preview
 

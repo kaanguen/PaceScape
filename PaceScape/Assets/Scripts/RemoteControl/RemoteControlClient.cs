@@ -37,12 +37,23 @@ namespace PaceScape.RemoteControl
             public readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
             public readonly ConcurrentQueue<IncomingCommand> Incoming = new ConcurrentQueue<IncomingCommand>();
             public readonly ConcurrentQueue<string> Outgoing = new ConcurrentQueue<string>();
+            public readonly SemaphoreSlim CameraFrameReady = new SemaphoreSlim(0, 1);
             public readonly ClientWebSocket Socket = new ClientWebSocket();
             public Task Task;
             public string LatestState;
             public byte[] LatestCameraFrame;
             public string Error;
             public volatile bool IsConnected;
+
+            public void PublishCameraFrame(byte[] frame)
+            {
+                Interlocked.Exchange(ref LatestCameraFrame, frame);
+                // The main thread is the only producer. Coalesce wakeups like the frames themselves.
+                if (CameraFrameReady.CurrentCount == 0)
+                {
+                    CameraFrameReady.Release();
+                }
+            }
 
             public void Stop()
             {
@@ -322,7 +333,7 @@ namespace PaceScape.RemoteControl
                     if (message?.commandType == "camera.start" && _testScene == null)
                     {
                         ConnectionSession session = _session;
-                        success = _camera.TryStart(frame => Interlocked.Exchange(ref session.LatestCameraFrame, frame), out error);
+                        success = _camera.TryStart(session.PublishCameraFrame, out error);
                     }
                     else if (message?.commandType == "camera.stop" && _testScene == null)
                     {
@@ -622,7 +633,7 @@ namespace PaceScape.RemoteControl
                         token).ConfigureAwait(false);
                 }
 
-                await Task.Delay(50, token).ConfigureAwait(false);
+                await session.CameraFrameReady.WaitAsync(50, token).ConfigureAwait(false);
             }
         }
 
