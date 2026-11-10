@@ -15,6 +15,7 @@ namespace PaceScape.RemoteControl
         [SerializeField] private bool _connectionEnabled = true;
         [SerializeField] private string _serverUrl = DefaultServerUrl;
         [SerializeField] private string _accessToken = string.Empty;
+        [SerializeField] private bool _allowLanMotorControl;
 
         /// <summary>Gets whether the client should connect.</summary>
         public bool ConnectionEnabled => _connectionEnabled;
@@ -24,6 +25,13 @@ namespace PaceScape.RemoteControl
 
         /// <summary>Gets the optional shared token for a trusted local network.</summary>
         public string AccessToken => _accessToken;
+
+        /// <summary>Gets or sets whether the configured IP endpoint may issue motor commands over LAN.</summary>
+        public bool AllowLanMotorControl
+        {
+            get => _allowLanMotorControl;
+            set => _allowLanMotorControl = value;
+        }
 
         /// <summary>Validates all connection values before updating the project defaults.</summary>
         public bool TryConfigure(bool connectionEnabled, string serverUrl, string accessToken)

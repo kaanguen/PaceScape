@@ -32,19 +32,21 @@ adb reverse tcp:8787 tcp:8787
 
 The Unity client defaults to `ws://127.0.0.1:8787/ws`. USB forwarding connects the headset's loopback port to the computer's loopback port; without it, localhost on the headset refers to the headset itself. Reapply forwarding after reconnecting/rebooting when necessary. With multiple ADB devices, use `adb -s SERIAL reverse tcp:8787 tcp:8787`.
 
+If the dashboard loads but shows the headset as disconnected, use `adb devices` to confirm the headset is listed as `device` and `adb reverse --list` to confirm the mapping contains `tcp:8787 tcp:8787`. If the headset previously used WLAN, check for a device override pointing to the computer's LAN address. For USB, set that override's `ServerUrl` to `ws://127.0.0.1:8787/ws` and restart the app. Stop any simulated headset or Unity Play session occupying the server's single headset slot.
+
 `RemoteControlClient` is created after the first scene loads when a `TagTracker` exists. It finds the scene tracker and plane placement once. It has its own GameObject so stopping `TagTracker` does not stop the connection. No scene or prefab YAML changes are needed. It is scoped to that scene; later additive-scene switching is not implemented.
 
 The Android manifest now declares `android.permission.INTERNET` and allows cleartext traffic for local `ws://`. No new Unity packages or project setting changes are required by this implementation. It uses .NET `ClientWebSocket`; actual Android/IL2CPP behavior still needs a device build and test.
 
 ## Optional LAN connection
 
-The server binds only to `127.0.0.1` by default. To allow LAN connections:
+The current PaceScape Control server binds to `0.0.0.0` by default. If it was started with a loopback-only `HOST`, restart it with:
 
 ```sh
-HOST=0.0.0.0 ACCESS_TOKEN='replace-with-your-own-random-shared-key' npm start
+HOST=0.0.0.0 npm start
 ```
 
-LAN binding requires a shared key of at least 16 characters. Enter the same key on the dashboard and choose reconnect. The browser keeps it in memory only.
+The current server accepts LAN clients without an access token. The computer and headset must be able to reach each other on TCP port 8787. Networks with client isolation can prevent this even when both devices use the same WLAN.
 
 Before starting the app, put `pacescape-control.json` in `Application.persistentDataPath`:
 
@@ -52,7 +54,7 @@ Before starting the app, put `pacescape-control.json` in `Application.persistent
 {
   "Enabled": true,
   "ServerUrl": "ws://192.168.1.42:8787/ws",
-  "AccessToken": "replace-with-your-own-random-shared-key"
+  "AccessToken": ""
 }
 ```
 
@@ -65,7 +67,7 @@ adb push pacescape-control.json /sdcard/Android/data/com.Kaan.PaceScape/files/pa
 
 Restart the app after changing this file. Without the file, saved project/build defaults apply, falling back to USB/loopback when no project settings asset exists. `{"Enabled":false}` disables remote connections on the next app start. The settings asset persists build defaults; this optional file persists a per-device override; settings changed by commands are not saved across app launches.
 
-`ws://` is plaintext, including the shared key. Use this service on loopback or a trusted local network without public port forwarding. The server does not provide TLS or user accounts. The client does not bypass certificate validation for `wss://`.
+`ws://` is plaintext. Use this service on loopback or a trusted local network without public port forwarding. The server does not provide TLS or user accounts. The client does not bypass certificate validation for `wss://`.
 
 ## Supported behavior
 

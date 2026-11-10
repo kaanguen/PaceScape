@@ -15,3 +15,4 @@ MonoBehaviour:
   _connectionEnabled: 1
   _serverUrl: ws://127.0.0.1:8787/ws
   _accessToken: 
+  _allowLanMotorControl: 1

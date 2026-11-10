@@ -16,6 +16,7 @@ namespace PaceScape.Editor
         private const string AssetPath = "Assets/Resources/PaceScapeConnection.asset";
         private const string StylePath = "Assets/Editor/RemoteControlSettingsWindow.uss";
         private Toggle _connectionEnabled;
+        private Toggle _allowLanMotorControl;
         private TextField _serverUrl;
         private TextField _accessToken;
         private Button _reconnectButton;
@@ -83,6 +84,11 @@ namespace PaceScape.Editor
                 isPasswordField = true,
                 tooltip = "Optional; muss bei LAN-Betrieb dem ACCESS_TOKEN des Servers entsprechen."
             };
+            _allowLanMotorControl = new Toggle("Laufbandsteuerung im WLAN erlauben")
+            {
+                value = settings != null && settings.AllowLanMotorControl,
+                tooltip = "Nur für den eigenen PaceScape-Server in einem vertrauenswürdigen Netz. Der Server muss die WLAN-Steuerung ausdrücklich freigeben."
+            };
             scroll.Add(_connectionEnabled);
             scroll.Add(_serverUrl);
             var detectAddress = new Button(UseLocalComputerAddress) { text = "Rechner-IP übernehmen" };
@@ -103,6 +109,7 @@ namespace PaceScape.Editor
                 }
             });
             scroll.Add(_localAddressChoice);
+            scroll.Add(_allowLanMotorControl);
             scroll.Add(_accessToken);
             AddDescription(scroll, "USB: ws://127.0.0.1:8787/ws mit adb reverse. WLAN: die IP-Adresse des Rechners statt localhost eintragen; Server im LAN-Modus starten.");
             AddDescription(scroll, "Der Schlüssel wird im Projekt und im App-Build gespeichert. Auf der Brille hat eine vorhandene pacescape-control.json Vorrang; im Editor gelten diese Projekteinstellungen.");
@@ -253,12 +260,14 @@ namespace PaceScape.Editor
 
                     settings = CreateInstance<RemoteControlSettings>();
                     settings.TryConfigure(_connectionEnabled.value, uri.AbsoluteUri, _accessToken.value);
+                    settings.AllowLanMotorControl = _allowLanMotorControl.value;
                     AssetDatabase.CreateAsset(settings, AssetPath);
                 }
                 else
                 {
                     Undo.RecordObject(settings, "Change PaceScape server connection");
                     settings.TryConfigure(_connectionEnabled.value, uri.AbsoluteUri, _accessToken.value);
+                    settings.AllowLanMotorControl = _allowLanMotorControl.value;
                     EditorUtility.SetDirty(settings);
                 }
 

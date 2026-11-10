@@ -31,6 +31,19 @@ public class BleConnection : MonoBehaviour
     }
     public void Read(string service, string characteristic) => Enqueue(service,characteristic,false,1);
     public void Subscribe(string service,string characteristic,BleUpdateMode mode = BleUpdateMode.NotifyPreferred) => Enqueue(service,characteristic,true,(int)mode);
+    /// <summary>Sends a write only when the existing read and subscription queue is idle.</summary>
+    public bool TryWriteIdle(string service, string characteristic, byte[] data)
+    {
+        if (!Connected || operations?.Idle != true || !HasCharacteristic(service, characteristic))
+        {
+            return false;
+        }
+
+        new WriteToCharacteristic(connectedId, BleUuid.Normalize(service),
+            BleUuid.Normalize(characteristic), data, true).Start();
+        return true;
+    }
+
     void Enqueue(string service,string characteristic,bool subscribe,int mode)
     {
         if (!Connected) throw new InvalidOperationException("Keine Verbindung.");

@@ -15,34 +15,37 @@ namespace PaceScape.Tests
         private static void Set(object target, string name, object value) => target.GetType().GetField(name, PrivateInstance).SetValue(target, value);
 
         [Test]
-        public void CalibrationProjectsOntoFloorAndKeepsAWorldLockedHeading()
+        public void CalibrationProjectsOntoFloor()
         {
             Type type = RuntimeType("RunningTrack.TreadmillGhostPresentation");
-            object[] args = { new Vector3(3, 1.8f, 4), new Vector3(1, -0.5f, 0), Pose.identity };
+            object[] args = { new Vector3(3, 1.8f, 4), Vector3.zero };
             Assert.That(type.GetMethod("TryCalibrate").Invoke(null, args), Is.True);
-            Pose origin = (Pose)args[2];
-            Assert.That(origin.position, Is.EqualTo(new Vector3(3, 0, 4)));
-            Assert.That(Vector3.Distance(origin.rotation * Vector3.forward, Vector3.right), Is.LessThan(0.0001f));
-            object settings = Activator.CreateInstance(type);
-            object[] evaluation = { origin, 2.0, Pose.identity };
-            Assert.That(Call(settings, "Evaluate", evaluation), Is.True);
-            Pose pose = (Pose)evaluation[2];
-            Assert.That(Vector3.Distance(pose.position, new Vector3(5, 0, 2.5f)), Is.LessThan(0.0001f));
-            Assert.That(Quaternion.Angle(pose.rotation, origin.rotation), Is.LessThan(0.0001f));
+            Assert.That(args[1], Is.EqualTo(new Vector3(3, 0, 4)));
         }
 
-        [TestCase(-2.0)]
-        [TestCase(0.0)]
-        [TestCase(2.0)]
-        public void OvertakingChangesLongitudinalPositionWithoutTurningTheGhost(double gap)
+        [TestCase(1, 0.0, -2.0)]
+        [TestCase(8, 0.0, 2.0)]
+        [TestCase(3, 8.0, 5.0)]
+        [TestCase(4, 35.0, -2.0)]
+        [TestCase(5, 175.0, 0.0)]
+        [TestCase(8, 270.0, 2.0)]
+        public void RelativeGapFollowsTheSelectedLane(int lane, double reference, double gap)
         {
             object settings = Create("RunningTrack.TreadmillGhostPresentation");
-            object[] args = { Pose.identity, gap, Pose.identity };
+            Pose referencePose = EvaluateLane(lane, reference);
+            Vector3 calibration = referencePose.position + referencePose.rotation * Vector3.right * 2;
+            object[] args = { lane, calibration, gap, Pose.identity };
             Assert.That(Call(settings, "Evaluate", args), Is.True);
-            Pose pose = (Pose)args[2];
-            Assert.That(pose.position.x, Is.EqualTo(1.5f));
-            Assert.That(pose.position.z, Is.EqualTo((float)gap));
-            Assert.That(pose.rotation, Is.EqualTo(Quaternion.identity));
+            Pose pose = (Pose)args[3];
+            Pose expected = EvaluateLane(lane, reference + gap);
+            Assert.That(Vector3.Distance(pose.position, expected.position), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(pose.rotation, expected.rotation), Is.LessThan(0.01f));
+        }
+
+        private static Pose EvaluateLane(int lane, double distance)
+        {
+            return (Pose)RuntimeType("RunningTrack.RunningTrackGeometry").GetMethod("EvaluateLane")
+                .Invoke(null, new object[] { lane, distance });
         }
 
         [TestCase(-10.01, false)]
@@ -54,23 +57,23 @@ namespace PaceScape.Tests
         public void OnlyFiniteGapsWithinTheConfiguredDistanceAreVisible(double gap, bool expected)
         {
             object settings = Create("RunningTrack.TreadmillGhostPresentation");
-            object[] args = { Pose.identity, gap, Pose.identity };
+            object[] args = { 1, Vector3.zero, gap, Pose.identity };
             Assert.That(Call(settings, "Evaluate", args), Is.EqualTo(expected));
-            Assert.That(Mathf.Abs(((Pose)args[2]).position.z), Is.LessThanOrEqualTo(10));
+            Assert.That(Mathf.Abs(((Pose)args[3]).position.z), Is.LessThanOrEqualTo(10));
         }
 
         [Test]
-        public void InvalidSettingsAndVerticalCalibrationCannotReplaceValidValues()
+        public void InvalidSettingsAndCalibrationCannotReplaceValidValues()
         {
             object settings = Create("RunningTrack.TreadmillGhostPresentation");
             Assert.That(Call(settings, "TryConfigure", "TreadmillRelative", -2f, 8f), Is.True);
             Assert.That(Call(settings, "TryConfigure", "Other", 1.5f, 10f), Is.False);
             Assert.That(Call(settings, "TryConfigure", "Track", 0f, 10f), Is.False);
             Assert.That(Call(settings, "TryConfigure", "Track", 1f, float.NaN), Is.False);
-            object[] evaluation = { Pose.identity, 9.0, Pose.identity };
+            object[] evaluation = { 1, Vector3.zero, 9.0, Pose.identity };
             Assert.That(Call(settings, "Evaluate", evaluation), Is.False);
-            Assert.That(((Pose)evaluation[2]).position.x, Is.EqualTo(-2));
-            object[] calibration = { Vector3.up, Vector3.up, Pose.identity };
+            Assert.That(((Pose)evaluation[3]).position.z, Is.EqualTo(8).Within(0.0001f));
+            object[] calibration = { new Vector3(float.NaN, 0, 0), Vector3.zero };
             Assert.That(settings.GetType().GetMethod("TryCalibrate").Invoke(null, calibration), Is.False);
         }
 

@@ -199,7 +199,7 @@ namespace PaceScape.Tracking
             return true;
         }
 
-        /// <summary>Locks the floor point below the head and forward heading; looking around never recalibrates.</summary>
+        /// <summary>Locks the floor point below the head for the lane-relative reference.</summary>
         public bool TryCalibrateGhostPresentation()
         {
             if (!_ghostPresentation.Enabled || RunState != RunningSession.RunState.Ready ||
@@ -213,7 +213,7 @@ namespace PaceScape.Tracking
                 Transform frame = marker.Instance.transform;
                 Transform head = _xrOrigin.Camera.transform;
                 if (!TreadmillGhostPresentation.TryCalibrate(frame.InverseTransformPoint(head.position),
-                    frame.InverseTransformDirection(head.forward), out Pose origin))
+                    out Vector3 origin))
                 {
                     return false;
                 }
@@ -253,7 +253,7 @@ namespace PaceScape.Tracking
                 double gap = 0;
                 bool hasGap = RunState == RunningSession.RunState.Ready ||
                     (PerformanceSource != null && PerformanceSource.TryGetGhostGap(out gap));
-                bool inRange = _ghostPresentation.Evaluate(marker.GhostOrigin,
+                bool inRange = _ghostPresentation.Evaluate(_spawnLane, marker.GhostOrigin,
                     gap - _distanceBehindStartLine, out Pose pose);
                 _presentationVisible = hasGap && inRange;
                 marker.Motion.SetPresentationPose(pose, _presentationVisible);
@@ -346,6 +346,7 @@ namespace PaceScape.Tracking
             {
                 marker.Motion?.ResetToStart();
             }
+            ApplyGhostPresentation();
         }
 
         /// <summary>Updates detector settings; the caller must restart active tracking to apply them.</summary>
@@ -394,7 +395,7 @@ namespace PaceScape.Tracking
             public bool HasTracked;
             public RunningTrackMotion Motion;
             public bool HasGhostCalibration;
-            public Pose GhostOrigin;
+            public Vector3 GhostOrigin;
         }
 
         private void OnEnable()
