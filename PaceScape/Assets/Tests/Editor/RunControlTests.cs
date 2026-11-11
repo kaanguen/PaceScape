@@ -1,3 +1,5 @@
+// Checks run state transitions and dashboard control of the test runner.
+
 using System;
 using System.Collections;
 using System.Reflection;
@@ -6,7 +8,7 @@ using UnityEngine;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Exercises explicit run control with real lane motion while leaving native XR readiness unmocked.</summary>
+    // Exercises explicit run control with real lane motion while leaving native XR readiness unmocked.
     public sealed class RunControlTests
     {
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -116,6 +118,58 @@ namespace PaceScape.Tests
 
             Assert.That(Property("RunState").ToString(), Is.EqualTo("Ready"));
             Assert.That(_runner.transform.localPosition, Is.EqualTo(start));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TreadmillTrackFollowsMeasuredDistanceAndResets(bool sideBySide)
+        {
+            var track = new GameObject("Track visual").transform;
+            track.SetParent(_root.transform, false);
+            object visual = _markers[1UL];
+            Type visualType = visual.GetType();
+            visualType.GetField("Track").SetValue(visual, track);
+            visualType.GetField("HasGhostCalibration").SetValue(visual, true);
+            visualType.GetField("GhostOrigin").SetValue(visual, Vector3.zero);
+            Component performance = _root.AddComponent(RuntimeType("Performance.RunnerPerformance"));
+            _tracker.GetType().GetProperty("PerformanceSource").SetValue(_tracker, performance);
+            object laps = performance.GetType().GetField("_laps", PrivateInstance).GetValue(performance);
+            MethodInfo advance = laps.GetType().GetMethod("Advance");
+            MethodInfo applyPresentation = _tracker.GetType().GetMethod("ApplyGhostPresentation");
+            if (sideBySide)
+            {
+                Assert.That(TrackerCall("TrySetRunnerMode", "SideBySide"), Is.True);
+            }
+            else
+            {
+                Assert.That(TrackerCall("TryConfigureGhostPresentation", "TreadmillRelative", 1.5f, 10f), Is.True);
+            }
+            Vector3 start = track.localPosition;
+            Vector3 companionStart = _runner.transform.localPosition;
+
+            Assert.That(SessionCall("TryStart", true), Is.True);
+            advance.Invoke(laps, new object[] { 2.0, 9.0 });
+            applyPresentation.Invoke(_tracker, null);
+            Assert.That(track.localPosition.z, Is.EqualTo(start.z - 5f).Within(0.0001f));
+            if (sideBySide)
+            {
+                Assert.That(_runner.transform.localPosition, Is.EqualTo(companionStart));
+            }
+
+            Vector3 movingPosition = track.localPosition;
+            advance.Invoke(laps, new object[] { 1.0, 0.0 });
+            applyPresentation.Invoke(_tracker, null);
+            Assert.That(track.localPosition, Is.EqualTo(movingPosition));
+            Assert.That(SessionCall("TryPause"), Is.True);
+            applyPresentation.Invoke(_tracker, null);
+            Assert.That(track.localPosition, Is.EqualTo(movingPosition));
+            _tracker.GetType().GetMethod("ResetRun").Invoke(_tracker, null);
+            Assert.That(track.localPosition, Is.EqualTo(start));
+
+            Assert.That(TrackerCall("TrySetRunnerMode", "FixedPace"), Is.True);
+            Assert.That(TrackerCall("TryConfigureGhostPresentation", "Track", 1.5f, 10f), Is.True);
+            Assert.That(track.localPosition, Is.EqualTo(Vector3.zero));
+            Assert.That(track.localRotation, Is.EqualTo(Quaternion.identity));
         }
 
         [Test]

@@ -1,3 +1,5 @@
+// Checks dashboard command routing and validation against Unity scene components.
+
 using System;
 using System.Reflection;
 using NUnit.Framework;
@@ -5,7 +7,7 @@ using UnityEngine;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Checks remote commands against real scene components without a device or network connection.</summary>
+    // Checks remote commands against real scene components without a device or network connection.
     public sealed class RemoteControlTests
     {
         private GameObject _root;

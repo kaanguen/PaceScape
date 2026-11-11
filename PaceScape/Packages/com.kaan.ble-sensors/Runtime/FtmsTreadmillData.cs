@@ -1,11 +1,14 @@
+// Decodes speed and optional total distance from FTMS Treadmill Data packets.
+
 using System;
 
-/// <summary>Reads instantaneous speed and optional total distance from FTMS Treadmill Data.</summary>
+// Reads instantaneous speed and optional total distance from FTMS Treadmill Data.
 public static class FtmsTreadmillData
 {
     public const string ServiceUuid = "1826";
     public const string CharacteristicUuid = "2acd";
 
+    // Reads optional fields according to the packet flags and validates field lengths.
     public static void Read(byte[] packet, out double? speedKmh, out uint? totalDistanceMetres)
     {
         speedKmh = null;

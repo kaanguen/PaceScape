@@ -1,9 +1,11 @@
+// Evaluates positions and headings on the eight-lane oval.
+
 using System;
 using UnityEngine;
 
 namespace PaceScape.RunningTrack
 {
-    /// <summary>MarkerML2 oval dimensions and sampling, aligned to a marker on lane one's measurement line.</summary>
+    // MarkerML2 oval dimensions and sampling, aligned to a marker on lane one's measurement line.
     public static class RunningTrackGeometry
     {
         public const double StraightLength = 84.39;
@@ -18,25 +20,25 @@ namespace PaceScape.RunningTrack
         private const double EntryMetres = 390.0 * LapLength / 400.0;
         private const double EntryToBend = LapLength - EntryMetres;
 
-        /// <summary>Samples the oval in metres; local zero is the marker and local +Z is the initial run direction.</summary>
+        // Samples the oval in metres; local zero is the marker and local +Z is the initial run direction.
         public static Vector3 Evaluate(double metres, float outwardOffset = 0f)
         {
             return EvaluatePath(metres, Radius, outwardOffset).position;
         }
 
-        /// <summary>Gets the circumference of a lane centerline in metres.</summary>
+        // Gets the circumference of a lane centerline in metres.
         public static double GetLaneLength(int lane)
         {
             return 2 * StraightLength + 2 * Math.PI * GetLaneRadius(lane);
         }
 
-        /// <summary>Samples actual metres along a selected lane centerline, starting at the shared start line.</summary>
+        // Samples actual metres along a selected lane centerline, starting at the shared start line.
         public static Pose EvaluateLane(int lane, double metres)
         {
             return EvaluatePath(metres, GetLaneRadius(lane), 0f);
         }
 
-        /// <summary>Finds the nearest lane centerline coordinate to an anchor-local floor point.</summary>
+        // Finds the nearest lane centerline coordinate to an anchor-local floor point.
         public static double FindNearestLaneMetres(int lane, Vector3 point)
         {
             double radius = GetLaneRadius(lane);
@@ -76,6 +78,7 @@ namespace PaceScape.RunningTrack
             return InnerRadius + (lane - 0.5) * LaneWidth;
         }
 
+        // Wraps distance around the oval and returns a tangent-aligned pose.
         private static Pose EvaluatePath(double metres, double pathRadius, float outwardOffset)
         {
             if (double.IsNaN(metres) || double.IsInfinity(metres) ||

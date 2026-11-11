@@ -1,3 +1,5 @@
+// Creates BLE device profile assets from presets in the Unity Editor.
+
 using UnityEditor;
 using UnityEngine;
 

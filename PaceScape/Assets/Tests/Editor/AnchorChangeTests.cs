@@ -1,3 +1,5 @@
+// Checks how the OpenXR anchor subsystem batches additions, updates, and removals.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -9,7 +11,7 @@ using UnityEngine.XR.ARSubsystems;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Exercises the embedded SDK's anchor completion batches without native device calls.</summary>
+    // Exercises the embedded SDK's anchor completion batches without native device calls.
     public sealed class AnchorChangeTests
     {
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;

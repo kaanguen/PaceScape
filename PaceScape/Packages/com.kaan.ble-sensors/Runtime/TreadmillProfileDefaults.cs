@@ -1,3 +1,5 @@
+// Supplies the default FTMS profile and its treadmill speed subscription.
+
 using UnityEngine;
 
 public static class TreadmillProfileDefaults
@@ -16,6 +18,7 @@ public static class TreadmillProfileDefaults
         return profile;
     }
 
+    // Adds the FTMS treadmill data subscription when the profile lacks it.
     public static void EnsureSpeedChannel(BleDeviceProfile profile)
     {
         string key = BleUuid.Key(FtmsTreadmillData.ServiceUuid, FtmsTreadmillData.CharacteristicUuid);

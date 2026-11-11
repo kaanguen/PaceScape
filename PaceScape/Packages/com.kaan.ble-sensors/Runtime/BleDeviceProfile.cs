@@ -1,3 +1,5 @@
+// Defines how to identify a BLE device and which characteristics to read or subscribe to.
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -23,6 +25,7 @@ public sealed class BleChannel
 
 public static class BleUuid
 {
+    // Expands short Bluetooth UUIDs to their canonical form.
     public static string Normalize(string value)
     {
         string s = (value ?? "").Trim();
@@ -42,6 +45,7 @@ public sealed class BleDeviceProfile : ScriptableObject
     public string deviceId = "";
     public List<BleChannel> channels = new List<BleChannel>();
 
+    // Filters discovered devices by the profile's configured identifiers.
     public bool Matches(string id, string name)
     {
         if (!string.IsNullOrWhiteSpace(deviceId) && !string.Equals(deviceId.Trim(), id, StringComparison.OrdinalIgnoreCase)) return false;

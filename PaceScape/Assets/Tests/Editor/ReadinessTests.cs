@@ -1,3 +1,5 @@
+// Checks runner readiness, invalid settings, and shared track resource lifetime.
+
 using System;
 using System.Reflection;
 using NUnit.Framework;
@@ -5,7 +7,7 @@ using UnityEngine;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Checks invalid configuration, runner lifetime, and shared resource ownership.</summary>
+    // Checks invalid configuration, runner lifetime, and shared resource ownership.
     public sealed class ReadinessTests
     {
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;

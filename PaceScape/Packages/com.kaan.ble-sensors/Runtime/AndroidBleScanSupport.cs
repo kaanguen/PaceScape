@@ -1,3 +1,5 @@
+// Checks Android BLE scan prerequisites and clears stale plugin discovery state.
+
 using System;
 using UnityEngine;
 
@@ -13,6 +15,7 @@ internal static class AndroidBleScanSupport
         }
     }
 
+    // Checks platform prerequisites and resets the stopped scanner's address cache.
     internal static void PrepareScan(int apiLevel)
     {
 #if UNITY_ANDROID && !UNITY_EDITOR

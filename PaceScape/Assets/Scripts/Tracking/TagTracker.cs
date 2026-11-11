@@ -1,3 +1,5 @@
+// Detects AprilTags and manages anchored track content, runner controls, and tracking recovery.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,15 +19,11 @@ using UnityEngine.XR.OpenXR;
 
 namespace PaceScape.Tracking
 {
-    /// <summary>
-    /// Anchors content on the detected surface beneath each AprilTag 36H11 for the current session.
-    /// </summary>
+    // Anchors content on the detected surface beneath each AprilTag 36H11 for the current session.
     [DisallowMultipleComponent]
     public sealed class TagTracker : MonoBehaviour
     {
-        /// <summary>
-        /// Current phase of the tracking startup sequence.
-        /// </summary>
+        // Current phase of the tracking startup sequence.
         public enum StartupPhase
         {
             Stopped,
@@ -71,63 +69,74 @@ namespace PaceScape.Tracking
         [SerializeField] private string _startupStatus;
         [SerializeField] private string _startupError;
 
-        /// <summary>Gets the current startup phase.</summary>
+        // Gets the current startup phase.
         public StartupPhase Phase => _startupPhase;
 
-        /// <summary>Gets the current startup progress or failure description.</summary>
+        // Gets the current startup progress or failure description.
         public string StartupStatus => _startupStatus;
 
-        /// <summary>Gets the last failure, retained until the next startup attempt.</summary>
+        // Gets the last failure, retained until the next startup attempt.
         public string StartupError => _startupError;
 
-        /// <summary>Gets the configured target pace in decimal minutes per kilometre.</summary>
+        // Gets the configured target pace in decimal minutes per kilometre.
         public float PaceMinutesPerKilometre => _paceMinutesPerKilometre;
 
-        /// <summary>Gets the lane configured for this running session.</summary>
+        // Gets the lane configured for this running session.
         public int SpawnLane => _spawnLane;
 
-        /// <summary>Gets the configured start offset in metres.</summary>
+        // Gets the configured start offset in metres.
         public float DistanceBehindStartLine => _distanceBehindStartLine;
 
-        /// <summary>Gets the physical printed marker side length in metres.</summary>
+        // Gets the physical printed marker side length in metres.
         public float MarkerLength => _markerLength;
 
-        /// <summary>Gets the active-time startup timeout in seconds.</summary>
+        // Gets the active-time startup timeout in seconds.
         public float StartupTimeoutSeconds => _startupTimeoutSeconds;
 
-        /// <summary>Gets the marker capacity for this session.</summary>
+        // Gets the marker capacity for this session.
         public int MaxTrackedMarkers => _maxTrackedMarkers;
 
-        /// <summary>Gets the number of placed local anchors, including temporarily untracked anchors.</summary>
+        // Gets the number of placed local anchors, including temporarily untracked anchors.
         public int PlacedMarkerCount => _markers.Count;
 
-        /// <summary>Gets the number of marker poses awaiting a matching plane.</summary>
+        // Gets the number of marker poses awaiting a matching plane.
         public int PendingMarkerCount => _pendingMarkers.Count;
 
-        /// <summary>Gets the selected avatar speed mode, independently of the BLE connection.</summary>
+        // Gets the selected avatar speed mode.
         public RunningSession.RunnerMode Mode => _runSession.Mode;
 
-        /// <summary>Gets the ghost reference pace, independent of live belt speed and current-run bests.</summary>
+        public bool IsSideBySide => Mode == RunningSession.RunnerMode.SideBySide;
+
+        private bool UsesTreadmillPlacement => IsSideBySide || _ghostPresentation.Enabled;
+
+        // Gets the active pace in minutes per kilometre; zero denotes a stopped or unavailable belt.
         public float ActivePaceMinutesPerKilometre => PerformanceSource != null
             ? PerformanceSource.GetTargetPace(Mode, _paceMinutesPerKilometre)
-            : _paceMinutesPerKilometre;
+            : IsSideBySide ? 0 : _paceMinutesPerKilometre;
 
-        /// <summary>Gets or assigns the separate belt-measurement and record owner.</summary>
+        // Gets or assigns the separate belt-measurement and record owner.
         public RunnerPerformance PerformanceSource { get; set; }
 
-        /// <summary>Selects the runner mode and pauses a running session when the mode changes.</summary>
+        // Selects the runner mode and pauses a running session when the mode changes.
         public bool TrySetRunnerMode(string mode)
         {
+            if (mode == nameof(RunningSession.RunnerMode.SideBySide) && !IsSideBySide &&
+                (RunState != RunningSession.RunState.Ready || _markers.Count + _pendingMarkers.Count > 1))
+            {
+                return false;
+            }
+
             RunningSession.RunnerMode previous = Mode;
             bool success = _runSession.TrySetMode(mode);
             if (success && previous != Mode)
             {
                 PerformanceSource?.RunnerModeChanged();
+                ApplyGhostPresentation();
             }
             return success;
         }
 
-        /// <summary>Updates the target pace of existing and future objects after validation.</summary>
+        // Updates the target pace of existing and future objects after validation.
         public bool TrySetPace(float paceMinutesPerKilometre)
         {
             if (!IsPositiveFinite(paceMinutesPerKilometre) ||
@@ -140,10 +149,10 @@ namespace PaceScape.Tracking
             return true;
         }
 
-        /// <summary>Gets the explicit running state shared by all placed objects.</summary>
+        // Gets the explicit running state shared by all placed objects.
         public RunningSession.RunState RunState => _runSession.State;
 
-        /// <summary>Gets the number of visible objects with a tracked local anchor.</summary>
+        // Gets the number of visible objects with a tracked local anchor.
         public int RunnableMarkerCount
         {
             get
@@ -162,13 +171,13 @@ namespace PaceScape.Tracking
             }
         }
 
-        /// <summary>Reports whether the foreground tracking session can start or resume all placed objects.</summary>
+        // Reports whether the foreground tracking session can start or resume all placed objects.
         public bool CanRun => isActiveAndEnabled && IsForeground && _hasHeadTracking &&
             _startupPhase == StartupPhase.Ready && _markers.Count > 0 && RunnableMarkerCount == _markers.Count &&
-            (!_ghostPresentation.Enabled || (HasGhostCalibration && PerformanceSource != null && PerformanceSource.HasFreshInput));
+            (!UsesTreadmillPlacement || (HasGhostCalibration && PerformanceSource != null && PerformanceSource.HasFreshInput));
 
-        /// <summary>Gets the initial longitudinal separation used only by the relative distance display.</summary>
-        public float RelativeStartOffset => _ghostPresentation.Enabled ? _distanceBehindStartLine : 0;
+        // Gets the initial longitudinal separation used only by the relative distance display.
+        public float RelativeStartOffset => !IsSideBySide && _ghostPresentation.Enabled ? _distanceBehindStartLine : 0;
 
         private bool HasGhostCalibration
         {
@@ -186,7 +195,7 @@ namespace PaceScape.Tracking
             }
         }
 
-        /// <summary>Changes only presentation while Ready; treadmill-relative placement uses exactly one marker.</summary>
+        // Changes only presentation while Ready; treadmill-relative placement uses exactly one marker.
         public bool TryConfigureGhostPresentation(string mode, float sideOffset, float visibilityDistance)
         {
             if (RunState != RunningSession.RunState.Ready ||
@@ -199,10 +208,10 @@ namespace PaceScape.Tracking
             return true;
         }
 
-        /// <summary>Locks the floor point below the head for the lane-relative reference.</summary>
+        // Locks the floor point below the head for the lane-relative reference.
         public bool TryCalibrateGhostPresentation()
         {
-            if (!_ghostPresentation.Enabled || RunState != RunningSession.RunState.Ready ||
+            if (!UsesTreadmillPlacement || RunState != RunningSession.RunState.Ready ||
                 _markers.Count != 1 || RunnableMarkerCount != 1 || !_hasHeadTracking || !IsForeground ||
                 _xrOrigin == null || _xrOrigin.Camera == null)
             {
@@ -224,24 +233,32 @@ namespace PaceScape.Tracking
             return true;
         }
 
-        /// <summary>Applies a presentation-only pose after measurement without moving the anchored track.</summary>
+        // Presents the track and ghost relative to the fixed treadmill calibration.
         public void ApplyGhostPresentation()
         {
-            if (_ghostPresentation.Enabled && RunState == RunningSession.RunState.Paused)
+            if (UsesTreadmillPlacement && RunState == RunningSession.RunState.Paused)
             {
-                _presentationStatus = "Paused";
+                _presentationStatus = IsSideBySide && (PerformanceSource == null || !PerformanceSource.HasFreshInput)
+                    ? "BeltSignalUnavailable"
+                    : "Paused";
                 return;
             }
             _presentationVisible = false;
-            _presentationStatus = _ghostPresentation.Enabled ? "CalibrationRequired" : "Track";
+            _presentationStatus = UsesTreadmillPlacement ? "CalibrationRequired" : "Track";
+            double travelledMetres = PerformanceSource != null ? PerformanceSource.MeasuredDistanceMetres : 0;
             foreach (MarkerVisual marker in _markers.Values)
             {
                 if (marker.Motion == null)
                 {
                     continue;
                 }
-                if (!_ghostPresentation.Enabled)
+                if (!UsesTreadmillPlacement)
                 {
+                    if (marker.HasTreadmillTrackPose && marker.Track != null)
+                    {
+                        marker.Track.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                        marker.HasTreadmillTrackPose = false;
+                    }
                     marker.Motion.ClearPresentationPose();
                     continue;
                 }
@@ -250,10 +267,26 @@ namespace PaceScape.Tracking
                     marker.Motion.SetPresentationPose(Pose.identity, false);
                     continue;
                 }
+                Pose trackPose = TreadmillGhostPresentation.EvaluateTrackPose(_spawnLane, marker.GhostOrigin,
+                    travelledMetres, out double laneMetres);
+                if (marker.Track != null)
+                {
+                    marker.Track.SetLocalPositionAndRotation(trackPose.position, trackPose.rotation);
+                    marker.HasTreadmillTrackPose = true;
+                }
+                if (IsSideBySide)
+                {
+                    marker.Motion.SetPresentationPose(
+                        _ghostPresentation.EvaluateSideBySide(_spawnLane, marker.GhostOrigin), true);
+                    _presentationVisible = true;
+                    _presentationStatus = RunState == RunningSession.RunState.Ready ? "Ready" : "SideBySide";
+                    continue;
+                }
+
                 double gap = 0;
                 bool hasGap = RunState == RunningSession.RunState.Ready ||
                     (PerformanceSource != null && PerformanceSource.TryGetGhostGap(out gap));
-                bool inRange = _ghostPresentation.Evaluate(_spawnLane, marker.GhostOrigin,
+                bool inRange = _ghostPresentation.Evaluate(_spawnLane, laneMetres, trackPose,
                     gap - _distanceBehindStartLine, out Pose pose);
                 _presentationVisible = hasGap && inRange;
                 marker.Motion.SetPresentationPose(pose, _presentationVisible);
@@ -262,12 +295,12 @@ namespace PaceScape.Tracking
             }
         }
 
-        /// <summary>Reports presentation capability and calibration separately from run/measurement validity.</summary>
+        // Reports presentation capability and calibration separately from run/measurement validity.
         public GhostPresentationState CaptureGhostPresentation()
         {
             return new GhostPresentationState
             {
-                mode = _ghostPresentation.Enabled ? "TreadmillRelative" : "Track",
+                mode = IsSideBySide ? "SideBySide" : _ghostPresentation.Enabled ? "TreadmillRelative" : "Track",
                 sideOffsetMetres = _ghostPresentation.SideOffsetMetres,
                 visibilityDistanceMetres = _ghostPresentation.VisibilityDistanceMetres,
                 calibrated = HasGhostCalibration,
@@ -276,7 +309,7 @@ namespace PaceScape.Tracking
             };
         }
 
-        /// <summary>Applies pace, lane and offset together; positional changes require a reset waiting session.</summary>
+        // Applies pace, lane and offset together; positional changes require a reset waiting session.
         public bool TryConfigureRunner(float paceMinutesPerKilometre, int lane, float distanceBehindStartLine)
         {
             if (!IsPositiveFinite(paceMinutesPerKilometre) || paceMinutesPerKilometre < 0.1f ||
@@ -304,16 +337,20 @@ namespace PaceScape.Tracking
             _paceMinutesPerKilometre = paceMinutesPerKilometre;
             _spawnLane = lane;
             _distanceBehindStartLine = distanceBehindStartLine;
+            if (changesPosition && UsesTreadmillPlacement)
+            {
+                ApplyGhostPresentation();
+            }
             return true;
         }
 
-        /// <summary>Updates existing waiting objects and future placements; running or paused positional changes fail.</summary>
+        // Updates existing waiting objects and future placements; running or paused positional changes fail.
         public bool TrySetSpawn(int lane, float distanceBehindStartLine)
         {
             return TryConfigureRunner(_paceMinutesPerKilometre, lane, distanceBehindStartLine);
         }
 
-        /// <summary>Starts from the configured position only after all current placements are tracked.</summary>
+        // Starts from the configured position only after all current placements are tracked.
         public bool TryStartRun(float paceMinutesPerKilometre, int lane, float distanceBehindStartLine)
         {
             if (_runSession.State != RunningSession.RunState.Ready || !CanRun)
@@ -325,19 +362,19 @@ namespace PaceScape.Tracking
                 _runSession.TryStart(CanRun);
         }
 
-        /// <summary>Pauses movement while retaining positions, anchors and the selected settings.</summary>
+        // Pauses movement while retaining positions, anchors and the selected settings.
         public bool TryPauseRun()
         {
             return _runSession.TryPause();
         }
 
-        /// <summary>Resumes a paused run only when all existing placements are tracked again.</summary>
+        // Resumes a paused run only when all existing placements are tracked again.
         public bool TryResumeRun()
         {
             return _runSession.TryResume(CanRun);
         }
 
-        /// <summary>Stops movement and returns existing objects to their configured start positions.</summary>
+        // Stops movement and returns existing objects to their configured start positions.
         public void ResetRun()
         {
             _runSession.Reset();
@@ -349,7 +386,7 @@ namespace PaceScape.Tracking
             ApplyGhostPresentation();
         }
 
-        /// <summary>Updates detector settings; the caller must restart active tracking to apply them.</summary>
+        // Updates detector settings; the caller must restart active tracking to apply them.
         public bool TryConfigureTracking(float markerLength, float timeoutSeconds, int maxTrackedMarkers)
         {
             if (!IsPositiveFinite(markerLength) || markerLength < 0.001f || markerLength > 10f ||
@@ -394,6 +431,8 @@ namespace PaceScape.Tracking
             public float CreatedAt;
             public bool HasTracked;
             public RunningTrackMotion Motion;
+            public Transform Track;
+            public bool HasTreadmillTrackPose;
             public bool HasGhostCalibration;
             public Vector3 GhostOrigin;
         }
@@ -407,7 +446,7 @@ namespace PaceScape.Tracking
             BeginTracking();
         }
 
-        /// <summary>Starts a fresh local session after an error; previous content and pending poses are cleared.</summary>
+        // Starts a fresh local session after an error; previous content and pending poses are cleared.
         public void RetryTracking()
         {
             if (!isActiveAndEnabled)
@@ -438,6 +477,7 @@ namespace PaceScape.Tracking
             StartCoroutine(RunGuarded(InitializeTracking()));
         }
 
+        // Routes startup or recovery coroutine exceptions through the tracking failure handler.
         private IEnumerator RunGuarded(IEnumerator operation)
         {
             using (operation as IDisposable)
@@ -477,6 +517,7 @@ namespace PaceScape.Tracking
             }
         }
 
+        // Waits for permissions, OpenXR, and tracking subsystems in startup order.
         private IEnumerator InitializeTracking()
         {
             SetStartupPhase(StartupPhase.WaitingForScene, "Waiting for scene components to activate.");
@@ -724,6 +765,7 @@ namespace PaceScape.Tracking
             return error == null;
         }
 
+        // Waits for a readiness condition using the active-time startup timeout.
         private IEnumerator WaitForStartupStep(StartupPhase phase, string description, Func<bool> isReady)
         {
             SetStartupPhase(phase, description);
@@ -818,6 +860,7 @@ namespace PaceScape.Tracking
             }
         }
 
+        // Keeps detected marker poses available until a matching plane can be used.
         private void UpdateTracking()
         {
             if (!HasTrackingPermissions())
@@ -921,9 +964,17 @@ namespace PaceScape.Tracking
             }
         }
 
+        // Gates content visibility on anchor and headset tracking.
         private bool UpdateVisuals()
         {
-            float effectivePace = ActivePaceMinutesPerKilometre;
+            double beltSpeed = 0;
+            if (IsSideBySide && (PerformanceSource == null ||
+                !PerformanceSource.TryGetBeltSpeedMetresPerSecond(out beltSpeed)))
+            {
+                _runSession.TryPause();
+            }
+
+            float effectivePace = IsSideBySide ? 0 : ActivePaceMinutesPerKilometre;
 
             // Check every anchor before advancing any runner; tracking loss pauses the entire session.
             foreach (MarkerVisual marker in _markers.Values)
@@ -975,7 +1026,15 @@ namespace PaceScape.Tracking
 
                 if (isTracked && wasVisible)
                 {
-                    if (recorded && canAdvance)
+                    if (IsSideBySide && marker.Motion != null)
+                    {
+                        float delta = Time.unscaledDeltaTime;
+                        double speed = canAdvance ? beltSpeed : 0;
+                        // Keep the companion beside the belt while its gait follows the measured speed.
+                        marker.Motion.AdvanceRecorded(delta, speed * delta, speed);
+                        PerformanceSource?.ObserveGhostDistance(marker.Motion.TravelledMetres);
+                    }
+                    else if (recorded && canAdvance)
                     {
                         marker.Motion?.AdvanceRecorded(Time.unscaledDeltaTime, recordedTravel,
                             PerformanceSource.GhostSpeedMetresPerSecond);
@@ -995,6 +1054,7 @@ namespace PaceScape.Tracking
             return true;
         }
 
+        // Retains a marker pose while asynchronous plane detection catches up.
         private void RememberMarker(ulong markerId, Pose observedPose)
         {
             if (_markers.ContainsKey(markerId) || !MarkerPlanePlacement.IsFinitePose(observedPose))
@@ -1005,7 +1065,7 @@ namespace PaceScape.Tracking
             // Plane extraction is asynchronous; keep observations while looking at the surface.
             if (!_pendingMarkers.ContainsKey(markerId))
             {
-                if (_markers.Count + _pendingMarkers.Count >= (_ghostPresentation.Enabled ? 1 : _maxTrackedMarkers))
+                if (_markers.Count + _pendingMarkers.Count >= (UsesTreadmillPlacement ? 1 : _maxTrackedMarkers))
                 {
                     return;
                 }
@@ -1092,6 +1152,7 @@ namespace PaceScape.Tracking
             StartCoroutine(RunGuarded(RecoverTracking()));
         }
 
+        // Waits for tracking readiness after the application returns.
         private IEnumerator RecoverTracking()
         {
             float deadline = ActiveTime + _startupTimeoutSeconds;
@@ -1157,6 +1218,7 @@ namespace PaceScape.Tracking
             }
         }
 
+        // Builds the runner and track under a shared root beneath the anchor.
         private MarkerVisual PopulateVisual(GameObject anchorObject, ulong markerId)
         {
             if (!ValidateRunningConfiguration(out string configurationError))
@@ -1195,8 +1257,11 @@ namespace PaceScape.Tracking
             var motion = new RunningTrackMotion(instance.transform, _spawnLane,
                 _distanceBehindStartLine);
             // Ground the marker object before adding track bounds, which extend across the oval.
-            RunningTrackVisual.Create(content.transform);
-            return new MarkerVisual { Instance = content, Anchor = anchor, CreatedAt = ActiveTime, Motion = motion };
+            RunningTrackVisual track = RunningTrackVisual.Create(content.transform);
+            return new MarkerVisual
+            {
+                Instance = content, Anchor = anchor, CreatedAt = ActiveTime, Motion = motion, Track = track.transform
+            };
         }
 
         private static void PlaceVisualOnPlane(Transform visual, Transform anchor)
@@ -1316,6 +1381,7 @@ namespace PaceScape.Tracking
             }
         }
 
+        // Tears down the detector, scanning, anchors, and owned content.
         private void ReleaseResources()
         {
             _runSession.Reset();

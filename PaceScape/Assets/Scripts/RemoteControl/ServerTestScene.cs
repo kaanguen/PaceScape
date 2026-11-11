@@ -1,3 +1,5 @@
+// Runs a marker-free track and runner for testing dashboard controls in the Editor.
+
 using System;
 using PaceScape.Performance;
 using PaceScape.RunningTrack;
@@ -5,7 +7,7 @@ using UnityEngine;
 
 namespace PaceScape.RemoteControl
 {
-    /// <summary>A marker-free scene target for testing the real WebSocket client in the Editor.</summary>
+    // A marker-free scene target for testing the real WebSocket client in the Editor.
     [DisallowMultipleComponent]
     public sealed class ServerTestScene : MonoBehaviour
     {
@@ -20,21 +22,26 @@ namespace PaceScape.RemoteControl
         private bool _wasRunInBackground;
         private bool _isPaused;
 
-        /// <summary>Gets whether a runner has been spawned.</summary>
+        // Gets whether a runner has been spawned.
         public bool HasRunner => _runner != null;
 
-        /// <summary>Gets the active runner transform for preview and verification.</summary>
+        // Gets the active runner transform for preview and verification.
         public Transform RunnerTransform => _runner != null ? _runner.transform : null;
 
-        /// <summary>Gets the explicit run state.</summary>
+        // Gets the explicit run state.
         public RunningSession.RunState RunState => _session.State;
 
-        /// <summary>Gets the selected runner mode; the preview uses manual pace without BLE input.</summary>
+        // Gets the selected runner mode; the preview uses manual pace without BLE input.
         public RunningSession.RunnerMode Mode => _session.Mode;
 
-        /// <summary>Changes mode while retaining the visual position and pausing an active run.</summary>
+        // Changes mode while retaining the visual position and pausing an active run.
         public bool TrySetRunnerMode(string mode)
         {
+            if (mode == nameof(RunningSession.RunnerMode.SideBySide))
+            {
+                return false;
+            }
+
             RunningSession.RunnerMode previous = _session.Mode;
             bool success = _session.TrySetMode(mode);
             if (success && previous != _session.Mode)
@@ -44,7 +51,7 @@ namespace PaceScape.RemoteControl
             return success;
         }
 
-        /// <summary>Gets whether this scene can start or resume its runner.</summary>
+        // Gets whether this scene can start or resume its runner.
         public bool CanRun => isActiveAndEnabled && !_isPaused && HasRunner;
 
         private void OnEnable()
@@ -58,7 +65,7 @@ namespace PaceScape.RemoteControl
             RunningTrackVisual.Create(transform);
         }
 
-        /// <summary>Gets or assigns the shared comparison and record owner.</summary>
+        // Gets or assigns the shared comparison and record owner.
         public RunnerPerformance PerformanceSource { get; set; }
 
         private void Update()
@@ -89,13 +96,13 @@ namespace PaceScape.RemoteControl
             }
         }
 
-        /// <summary>Pauses an active run without changing the test runner's position.</summary>
+        // Pauses an active run without changing the test runner's position.
         public void PauseRun()
         {
             _session.TryPause();
         }
 
-        /// <summary>Spawns exactly one waiting visual using the complete validated settings.</summary>
+        // Spawns exactly one waiting visual using the complete validated settings.
         public bool TrySpawnRunner(float pace, int lane, float startDistance)
         {
             if (!isActiveAndEnabled || HasRunner || _runnerPrefab == null || !_runnerPrefab.activeSelf ||
@@ -140,7 +147,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
-        /// <summary>Removes the test visual and ends the run while preserving the scene track.</summary>
+        // Removes the test visual and ends the run while preserving the scene track.
         public void RemoveRunner()
         {
             _session.Reset();
@@ -161,7 +168,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
-        /// <summary>Applies pace and waiting start position together without an XR dependency.</summary>
+        // Applies pace and waiting start position together without an XR dependency.
         public bool TryConfigureRunner(float pace, int lane, float startDistance)
         {
             if (float.IsNaN(pace) || float.IsInfinity(pace) || pace < 0.1f || pace > 60f ||
@@ -244,6 +251,7 @@ namespace PaceScape.RemoteControl
             return success;
         }
 
+        // Reports the test runner and track state through the dashboard protocol.
         internal RemoteState CaptureState()
         {
             return new RemoteState

@@ -1,9 +1,11 @@
+// Validates and stores the fastest measured effort for each distance.
+
 using System;
 using System.Collections.Generic;
 
 namespace PaceScape.Performance
 {
-    /// <summary>A measured boundary relative to the beginning of a complete best effort.</summary>
+    // A measured boundary relative to the beginning of a complete best effort.
     [Serializable]
     public sealed class EffortPoint
     {
@@ -11,7 +13,7 @@ namespace PaceScape.Performance
         public double distanceMetres;
     }
 
-    /// <summary>One measured device-local personal best; demonstration values are never stored here.</summary>
+    // One measured device-local personal best; demonstration values are never stored here.
     [Serializable]
     public sealed class PersonalBestRecord
     {
@@ -20,7 +22,7 @@ namespace PaceScape.Performance
         public string achievedUtc;
         public List<EffortPoint> trace;
 
-        /// <summary>Checks complete boundaries, including stationary intervals, without inventing samples.</summary>
+        // Checks complete boundaries, including stationary intervals, without inventing samples.
         public bool HasValidTrace()
         {
             if (trace == null || trace.Count < 2 || trace.Count > 32000)
@@ -49,14 +51,14 @@ namespace PaceScape.Performance
         }
     }
 
-    /// <summary>A versioned collection of real treadmill best efforts keyed by exact distance.</summary>
+    // A versioned collection of real treadmill best efforts keyed by exact distance.
     [Serializable]
     public sealed class PersonalBestBook
     {
         public int version = 1;
         public List<PersonalBestRecord> records = new List<PersonalBestRecord>();
 
-        /// <summary>Gets a measured best time, or zero when this distance has not been completed.</summary>
+        // Gets a measured best time, or zero when this distance has not been completed.
         public double Find(int distance)
         {
             foreach (PersonalBestRecord record in records)
@@ -69,13 +71,13 @@ namespace PaceScape.Performance
             return 0;
         }
 
-        /// <summary>Accepts the first complete effort and subsequent faster efforts only.</summary>
+        // Accepts the first complete effort and subsequent faster efforts only.
         public bool TryImprove(int distance, double seconds, string achievedUtc)
         {
             return TryImproveWithTrace(distance, seconds, achievedUtc, null);
         }
 
-        /// <summary>Stores an optional exact trace with a faster result, preserving legacy time-only records.</summary>
+        // Stores an optional exact trace with a faster result, preserving legacy time-only records.
         public bool TryImproveWithTrace(int distance, double seconds, string achievedUtc, List<EffortPoint> trace)
         {
             if (distance < 1 || distance > 1000000 || !ValidTime(seconds) || (achievedUtc != null && achievedUtc.Length > 64))
@@ -138,7 +140,7 @@ namespace PaceScape.Performance
             return true;
         }
 
-        /// <summary>Rejects corrupt, duplicate or incompatible records before loading a saved book.</summary>
+        // Rejects corrupt, duplicate or incompatible records before loading a saved book.
         public bool IsValid()
         {
             if (version != 1 || records == null || records.Count > 1024)

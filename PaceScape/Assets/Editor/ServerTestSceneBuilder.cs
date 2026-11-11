@@ -1,3 +1,5 @@
+// Creates or opens the Editor scene used to test dashboard commands without XR.
+
 using System;
 using PaceScape.RemoteControl;
 using UnityEditor;
@@ -7,12 +9,13 @@ using UnityEngine.SceneManagement;
 
 namespace PaceScape.Editor
 {
-    /// <summary>Creates the standalone server test scene through Unity's asset and scene APIs.</summary>
+    // Creates the standalone server test scene through Unity's asset and scene APIs.
     public static class ServerTestSceneBuilder
     {
         private const string ScenePath = "Assets/Scenes/ServerTestScene.unity";
         private const string MaterialPath = "Assets/Scenes/ServerTestGround.mat";
 
+        // Opens the existing test scene or creates it on first use.
         [MenuItem("PaceScape/Server-Testszene erstellen oder öffnen")]
         private static void CreateOrOpen()
         {
@@ -36,6 +39,7 @@ namespace PaceScape.Editor
             Debug.Log("[ServerTestScene] Opened the marker-free scene. Enter Play mode, then spawn the runner from the dashboard.");
         }
 
+        // Saves a test scene with a camera, ground, and a configured runner prefab.
         private static void CreateScene()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/PlaceHolders/PlaceHolder.prefab");

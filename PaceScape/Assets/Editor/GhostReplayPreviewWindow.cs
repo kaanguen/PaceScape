@@ -1,3 +1,5 @@
+// Previews PR replay and Side by Side with synthetic data in the Unity Editor.
+
 using System;
 using System.Collections.Generic;
 using PaceScape.Performance;
@@ -8,7 +10,7 @@ using UnityEngine.UIElements;
 
 namespace PaceScape.Editor
 {
-    /// <summary>Isolates synthetic PR playback in an unsaved preview scene without transport or record storage.</summary>
+    // Isolates synthetic playback in an unsaved preview scene without transport or record storage.
     public sealed class GhostReplayPreviewWindow : EditorWindow
     {
         private PreviewRenderUtility _preview;
@@ -20,6 +22,7 @@ namespace PaceScape.Editor
         private GameObject _userMarker;
         private readonly TreadmillGhostPresentation _relativePresentation = new TreadmillGhostPresentation();
         private bool _relativeView = true;
+        private bool _sideBySide;
         private double _simulatedUserDistance;
         private float _simulatedUserSpeedKmh = 10.8f;
         private float _viewYaw = 90f;
@@ -35,12 +38,14 @@ namespace PaceScape.Editor
         private bool _isRunning;
         private double _lastUpdate;
 
+        private bool UsesTreadmillView => _sideBySide || _relativeView;
+
         [MenuItem("PaceScape/Ghost-Vorschau (Testdaten)")]
         private static void OpenWindow()
         {
             var window = GetWindow<GhostReplayPreviewWindow>();
             window.titleContent = new GUIContent("Ghost-Vorschau");
-            window.minSize = new Vector2(560f, 460f);
+            window.minSize = new Vector2(560f, 520f);
         }
 
         private void OnEnable()
@@ -56,7 +61,7 @@ namespace PaceScape.Editor
             Cleanup();
         }
 
-        /// <summary>Creates preview controls; only the standard 3D preview surface uses an IMGUI container.</summary>
+        // Creates preview controls; only the standard 3D preview surface uses an IMGUI container.
         public void CreateGUI()
         {
             // Rebuilt Editor windows must not mix surviving scene objects with a new playback clock.
@@ -70,13 +75,15 @@ namespace PaceScape.Editor
                 rootVisualElement.styleSheets.Add(sheet);
             }
             rootVisualElement.AddToClassList("ghost-preview");
-            rootVisualElement.Add(new HelpBox("TESTDATEN · Fiktive 20-m- und 40-m-Rekorde. Keine echten Bestzeiten, keine Speicherung und keine Serververbindung. Die geöffnete Szene bleibt unverändert.", HelpBoxMessageType.Info));
+            rootVisualElement.Add(new HelpBox("TESTDATEN · Simuliertes Laufbandtempo und fiktive Bestzeiten. Die Vorschau läuft in einer separaten, ungespeicherten Szene.", HelpBoxMessageType.Info));
             _error = new HelpBox(string.Empty, HelpBoxMessageType.Error);
             _error.style.display = DisplayStyle.None;
             rootVisualElement.Add(_error);
             _status = new Label();
             _status.AddToClassList("ghost-preview-status");
             rootVisualElement.Add(_status);
+            var sideBySideToggle = new Toggle("Side by Side (adaptives Laufbandtempo)") { value = _sideBySide };
+            rootVisualElement.Add(sideBySideToggle);
             var relativeToggle = new Toggle("Laufbandansicht simulieren") { value = _relativeView };
             relativeToggle.RegisterValueChangedCallback(evt =>
             {
@@ -91,7 +98,11 @@ namespace PaceScape.Editor
                 value = _simulatedUserSpeedKmh,
                 showInputField = true
             };
-            speed.RegisterValueChangedCallback(evt => _simulatedUserSpeedKmh = evt.newValue);
+            speed.RegisterValueChangedCallback(evt =>
+            {
+                _simulatedUserSpeedKmh = evt.newValue;
+                UpdateStatus();
+            });
             rootVisualElement.Add(speed);
             var range = new FloatField("Sichtdistanz vor/hinter dir (m)") { value = 10f };
             Action configureRelative = () =>
@@ -140,10 +151,24 @@ namespace PaceScape.Editor
             var image = new IMGUIContainer(DrawPreview);
             image.AddToClassList("ghost-preview-image");
             rootVisualElement.Add(image);
-            rootVisualElement.Add(new Label("Ablauf: 2 → 3 m/s; bei 20 m Wechsel zum 40-m-Verlauf; danach 2 → 4,67 m/s. Ab 40 m bleibt das letzte Tempo erhalten.\nDie kurzen Distanzen dienen nur der Vorschau, nicht als Trainingsvorgabe."));
+            const string replayHint = "Ablauf: 2 → 3 m/s; bei 20 m Wechsel zum 40-m-Verlauf; danach 2 → 4,67 m/s. Ab 40 m bleibt das letzte Tempo erhalten.\nDie kurzen Distanzen dienen nur der Vorschau, nicht als Trainingsvorgabe.";
+            const string sideBySideHint = "Tempo während der Wiedergabe ändern. Bei 0 km/h geht der Avatar in den Stand.";
+            var hint = new Label(_sideBySide ? sideBySideHint : replayHint);
+            rootVisualElement.Add(hint);
+            relativeToggle.SetEnabled(!_sideBySide);
+            range.SetEnabled(!_sideBySide);
+            sideBySideToggle.RegisterValueChangedCallback(evt =>
+            {
+                _sideBySide = evt.newValue;
+                relativeToggle.SetEnabled(!_sideBySide);
+                range.SetEnabled(!_sideBySide);
+                hint.text = _sideBySide ? sideBySideHint : replayHint;
+                ResetPreview();
+            });
             UpdateStatus();
         }
 
+        // Creates the track and runner in an isolated preview scene on demand.
         private bool EnsurePreview()
         {
             if (_preview != null)
@@ -228,6 +253,7 @@ namespace PaceScape.Editor
             }
         }
 
+        // Builds fictitious traces that demonstrate a reference transition.
         private static PersonalBestBook CreateSyntheticRecords()
         {
             var book = new PersonalBestBook();
@@ -265,7 +291,14 @@ namespace PaceScape.Editor
                 _motion.ResetToStart();
                 _simulatedUserDistance = 0;
                 _replay.Reset(CreateSyntheticRecords(), 20, 2);
-                _motion.AdvanceRecorded(0.001f, 0, _replay.SpeedMetresPerSecond);
+                if (_sideBySide)
+                {
+                    _motion.Advance(0.001f, 0f);
+                }
+                else
+                {
+                    _motion.AdvanceRecorded(0.001f, 0, _replay.SpeedMetresPerSecond);
+                }
                 ApplyRelativePose();
                 _animator?.Update(0f);
             }
@@ -273,6 +306,7 @@ namespace PaceScape.Editor
             Repaint();
         }
 
+        // Advances playback only while the preview window is focused.
         private void Tick()
         {
             double now = EditorApplication.timeSinceStartup;
@@ -290,9 +324,17 @@ namespace PaceScape.Editor
 
         private void Advance(float delta)
         {
-            double travel = _replay.Advance(delta);
-            _motion.AdvanceRecorded(delta, travel, _replay.SpeedMetresPerSecond);
-            _simulatedUserDistance += _simulatedUserSpeedKmh / 3.6 * delta;
+            double beltSpeed = _simulatedUserSpeedKmh / 3.6;
+            if (_sideBySide)
+            {
+                _motion.AdvanceRecorded(delta, beltSpeed * delta, beltSpeed);
+            }
+            else
+            {
+                double travel = _replay.Advance(delta);
+                _motion.AdvanceRecorded(delta, travel, _replay.SpeedMetresPerSecond);
+            }
+            _simulatedUserDistance += beltSpeed * delta;
             ApplyRelativePose();
             _animator?.Update(delta);
             UpdateStatus();
@@ -305,16 +347,26 @@ namespace PaceScape.Editor
             {
                 return;
             }
-            _userMarker.SetActive(_relativeView && _overview);
-            if (_relativeView)
+            _userMarker.SetActive(UsesTreadmillView && _overview);
+            if (!UsesTreadmillView)
             {
-                bool visible = _relativePresentation.Evaluate(1, Vector3.zero,
-                    _replay.DistanceMetres - _simulatedUserDistance - 0.5, out Pose pose);
-                _motion.SetPresentationPose(pose, visible);
+                _track.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                _motion.ClearPresentationPose();
+                return;
+            }
+
+            Pose trackPose = TreadmillGhostPresentation.EvaluateTrackPose(1, Vector3.zero,
+                _simulatedUserDistance, out double laneMetres);
+            _track.transform.SetLocalPositionAndRotation(trackPose.position, trackPose.rotation);
+            if (_sideBySide)
+            {
+                _motion.SetPresentationPose(_relativePresentation.EvaluateSideBySide(1, Vector3.zero), true);
             }
             else
             {
-                _motion.ClearPresentationPose();
+                bool visible = _relativePresentation.Evaluate(1, laneMetres, trackPose,
+                    _replay.DistanceMetres - _simulatedUserDistance - 0.5, out Pose pose);
+                _motion.SetPresentationPose(pose, visible);
             }
         }
 
@@ -324,10 +376,17 @@ namespace PaceScape.Editor
             {
                 return;
             }
-            string state = _preview == null ? "Bereit" : _replay.IsHoldingSpeed ? "Letztes Tempo halten" : "Tempoverlauf";
+            _playButton.text = _isRunning ? "Pause" : "Start";
+            if (_sideBySide)
+            {
+                _status.text = $"{(_isRunning ? "Läuft" : "Pausiert")} · Bandtempo {_simulatedUserSpeedKmh:F1} km/h · Strecke {_simulatedUserDistance:F2} m";
+                _relativeStatus.text = $"Avatar bleibt {_relativePresentation.SideOffsetMetres:F1} m rechts vom simulierten Laufbandplatz (blau in der Übersicht).";
+                return;
+            }
+
+            string state = _replay.IsHoldingSpeed ? "Letztes Tempo halten" : "Tempoverlauf";
             _status.text = _preview == null ? "Bereit · Start öffnet die isolierte Vorschau." :
                 $"{(_isRunning ? "Läuft" : "Pausiert")} · {_replay.DistanceMetres:F2} m · {_replay.SpeedMetresPerSecond * 3.6:F1} km/h · Referenz {_replay.ReferenceDistanceMetres} m · {state}";
-            _playButton.text = _isRunning ? "Pause" : "Start";
             if (_relativeStatus != null)
             {
                 double gap = _replay.DistanceMetres - _simulatedUserDistance - 0.5;
@@ -343,8 +402,9 @@ namespace PaceScape.Editor
             {
                 return;
             }
-            Vector3 target = _relativeView ? Vector3.up : _runner.position + Vector3.up;
-            if (_relativeView && !_overview)
+            bool usesTreadmillView = UsesTreadmillView;
+            Vector3 target = usesTreadmillView ? Vector3.up : _runner.position + Vector3.up;
+            if (usesTreadmillView && !_overview)
             {
                 _userMarker.SetActive(false);
                 _preview.camera.fieldOfView = 65f;
@@ -353,9 +413,9 @@ namespace PaceScape.Editor
             }
             else
             {
-                _userMarker.SetActive(_relativeView);
-                _preview.camera.fieldOfView = _relativeView ? 55f : 45f;
-                _preview.camera.transform.position = target + (_relativeView ? new Vector3(10f, 9f, -14f) : new Vector3(5f, 3f, -7f));
+                _userMarker.SetActive(usesTreadmillView);
+                _preview.camera.fieldOfView = usesTreadmillView ? 55f : 45f;
+                _preview.camera.transform.position = target + (usesTreadmillView ? new Vector3(10f, 9f, -14f) : new Vector3(5f, 3f, -7f));
                 _preview.camera.transform.LookAt(target);
             }
             _preview.BeginPreview(rect, GUIStyle.none);
@@ -380,6 +440,7 @@ namespace PaceScape.Editor
             }
         }
 
+        // Releases the preview scene and its generated resources.
         private void Cleanup()
         {
             _isRunning = false;

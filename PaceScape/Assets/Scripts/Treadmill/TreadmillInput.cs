@@ -1,3 +1,5 @@
+// Reads FTMS telemetry and coordinates acknowledged treadmill control over BLE.
+
 using System;
 using UnityEngine;
 
@@ -11,7 +13,7 @@ namespace PaceScape.Treadmill
         Stop
     }
 
-    /// <summary>Reads FTMS telemetry and handles explicitly authorized motor requests.</summary>
+    // Reads FTMS telemetry and handles explicitly authorized motor requests.
     [DisallowMultipleComponent]
     public sealed class TreadmillInput : MonoBehaviour
     {
@@ -44,7 +46,7 @@ namespace PaceScape.Treadmill
         private int _speedStepUnits;
         private bool _speedRangeReadPending;
 
-        /// <summary>Raised when a disconnect or invalid notification breaks measurement continuity.</summary>
+        // Raised when a disconnect or invalid notification breaks measurement continuity.
         public event Action MeasurementInterrupted;
 
         private void Awake()
@@ -60,6 +62,7 @@ namespace PaceScape.Treadmill
             _measurements.TreadmillSignalLost += OnMeasurementInterrupted;
         }
 
+        // Accepts an eligible motor operation and waits for its FTMS response.
         internal bool TryControlBelt(string deviceId, BeltOperation operation, int targetSpeedUnits, Func<bool> canContinue,
             Action<string> completed, out string error)
         {
@@ -88,6 +91,7 @@ namespace PaceScape.Treadmill
             _speedRangeReadPending = false;
         }
 
+        // Checks operation-specific belt state and speed constraints.
         private bool IsBeltReady(BeltOperation operation, int targetSpeedUnits)
         {
             if (!isActiveAndEnabled || !_connection.Connected ||
@@ -148,6 +152,7 @@ namespace PaceScape.Treadmill
             SendControlStep(RequestControl);
         }
 
+        // Matches control-point replies to the pending FTMS request.
         private void OnGattDataReceived(string service, string characteristic, byte[] data)
         {
             if (service == FtmsServiceUuid && characteristic == FtmsSpeedRangeUuid && data.Length == 6)
@@ -181,6 +186,7 @@ namespace PaceScape.Treadmill
             }
         }
 
+        // Writes the next FTMS opcode and waits for its response.
         private void SendControlStep(byte opcode)
         {
             if (Time.realtimeSinceStartup >= _controlDeadline || !_canContinueControl() || !IsBeltReady(_operation, _targetSpeedUnits))
@@ -234,7 +240,7 @@ namespace PaceScape.Treadmill
             completed(error);
         }
 
-        /// <summary>Reports a fresh speed without treating stopped belts as missing data.</summary>
+        // Reports a fresh speed without treating stopped belts as missing data.
         public bool TryGetSpeedKmh(out double speedKmh)
         {
             speedKmh = 0;
@@ -243,7 +249,7 @@ namespace PaceScape.Treadmill
                 !double.IsNaN(speedKmh) && !double.IsInfinity(speedKmh) && speedKmh >= 0;
         }
 
-        /// <summary>Applies operator-selected BLE actions. Connection success only means the request was accepted.</summary>
+        // Applies operator-selected BLE actions. Connection success only means the request was accepted.
         public bool TryApply(string command, string deviceId, out string error)
         {
             error = null;
@@ -289,6 +295,7 @@ namespace PaceScape.Treadmill
             }
         }
 
+        // Reports fresh belt measurements, devices, and control status to the dashboard.
         internal TreadmillState CaptureState()
         {
             var state = new TreadmillState

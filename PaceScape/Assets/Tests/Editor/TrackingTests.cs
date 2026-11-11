@@ -1,3 +1,5 @@
+// Checks plane placement and tracking configuration with synthetic inputs.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -10,7 +12,7 @@ using UnityEngine.XR.ARSubsystems;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Regression checks for placement geometry and device-independent lifecycle behavior.</summary>
+    // Regression checks for placement geometry and device-independent lifecycle behavior.
     public sealed class TrackingTests
     {
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;

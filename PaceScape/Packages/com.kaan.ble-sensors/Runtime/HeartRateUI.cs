@@ -1,3 +1,5 @@
+// Displays live heart-rate measurements and connection controls in Unity.
+
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;

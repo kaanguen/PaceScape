@@ -1,3 +1,5 @@
+// Checks lap timing, rolling efforts, and validation of personal-best records.
+
 using System;
 using System.Collections;
 using System.IO;
@@ -7,7 +9,7 @@ using UnityEngine;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Checks complete laps, continuous-window records and measured/demo separation without BLE.</summary>
+    // Checks complete laps, continuous-window records and measured/demo separation without BLE.
     public sealed class PerformanceTests
     {
         private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;

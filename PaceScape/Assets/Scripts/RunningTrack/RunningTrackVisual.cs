@@ -1,3 +1,5 @@
+// Builds the oval markings and shares generated mesh and material resources.
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,7 +7,7 @@ using UnityEngine.Rendering;
 
 namespace PaceScape.RunningTrack
 {
-    /// <summary>Creates floor markings under the same visibility root as the marker object.</summary>
+    // Creates floor markings under the same visibility root as the marker object.
     [DisallowMultipleComponent]
     public sealed class RunningTrackVisual : MonoBehaviour
     {
@@ -17,7 +19,7 @@ namespace PaceScape.RunningTrack
         private static int _resourceUsers;
         private bool _hasResources;
 
-        /// <summary>Builds an eight-lane oval aligned with the parent's floor pose, without changing its scale.</summary>
+        // Builds an eight-lane oval aligned with the parent's floor pose, without changing its scale.
         public static RunningTrackVisual Create(Transform parent)
         {
             if (parent == null)
@@ -48,6 +50,7 @@ namespace PaceScape.RunningTrack
             }
         }
 
+        // Shares one generated mesh and material across active track owners.
         private static void AcquireResources()
         {
             if (_resourceUsers == 0)
@@ -73,6 +76,7 @@ namespace PaceScape.RunningTrack
             _resourceUsers++;
         }
 
+        // Generates lane markings as a single mesh for rendering.
         private static Mesh BuildMesh()
         {
             int quadCount = Segments * (RunningTrackGeometry.LaneCount + 1) + 81;
@@ -147,7 +151,7 @@ namespace PaceScape.RunningTrack
             ReleaseGeneratedResources();
         }
 
-        /// <summary>Releases generated assets, including when content was never active before removal.</summary>
+        // Releases generated assets, including when content was never active before removal.
         public void ReleaseGeneratedResources()
         {
             if (!_hasResources)

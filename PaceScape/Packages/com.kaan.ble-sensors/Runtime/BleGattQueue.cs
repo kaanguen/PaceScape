@@ -1,3 +1,5 @@
+// Runs one GATT operation at a time and matches callbacks to the active request.
+
 using System;
 using System.Collections.Generic;
 
@@ -33,6 +35,7 @@ public sealed class BleGattQueue : IDisposable
         request.Characteristic = BleUuid.Normalize(request.Characteristic);
         pending.Enqueue(request);
     }
+    // Starts pending work and times out the active GATT request.
     public void Tick(float now)
     {
         if (disposed) return;
@@ -57,6 +60,7 @@ public sealed class BleGattQueue : IDisposable
             catch (Exception e) { Fail(e.Message); return; }
         }
     }
+    // Completes the active request only when the callback matches its device and operation.
     public void Handle(string address,string service,string characteristic,string command,string descriptor,byte[] data,bool error,string errorText)
     {
         if (active == null || !string.Equals(address,active.Address,StringComparison.OrdinalIgnoreCase)

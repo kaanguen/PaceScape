@@ -1,9 +1,11 @@
+// Moves the runner along its lane and matches the animation to its physical speed.
+
 using System;
 using UnityEngine;
 
 namespace PaceScape.RunningTrack
 {
-    /// <summary>Moves one grounded object along its lane, smoothing live speed changes with its animation.</summary>
+    // Moves one grounded object along its lane, smoothing live speed changes with its animation.
     public sealed class RunningTrackMotion
     {
         private static readonly int _speedParameter = Animator.StringToHash("Speed");
@@ -28,10 +30,10 @@ namespace PaceScape.RunningTrack
         private readonly bool[] _rendererVisibility;
         private bool _hasRelativePose;
 
-        /// <summary>Gets unwrapped travel from the configured start, excluding the start offset.</summary>
+        // Gets unwrapped travel from the configured start, excluding the start offset.
         public double TravelledMetres { get; private set; }
 
-        /// <summary>Places the object behind the shared start line, preserving its grounded height and scale.</summary>
+        // Places the object behind the shared start line, preserving its grounded height and scale.
         public RunningTrackMotion(Transform target, int lane, float distanceBehindStartLine)
         {
             if (target == null)
@@ -67,7 +69,7 @@ namespace PaceScape.RunningTrack
             ConfigureStart(lane, distanceBehindStartLine);
         }
 
-        /// <summary>Repositions on the requested lane at the start offset while preserving grounded height.</summary>
+        // Repositions on the requested lane at the start offset while preserving grounded height.
         public void ConfigureStart(int lane, float distanceBehindStartLine)
         {
             if (lane < 1 || lane > RunningTrackGeometry.LaneCount || !IsFinite(distanceBehindStartLine) ||
@@ -81,7 +83,7 @@ namespace PaceScape.RunningTrack
             ResetToStart();
         }
 
-        /// <summary>Returns to the configured start without moving the anchor or track.</summary>
+        // Returns to the configured start without moving the anchor or track.
         public void ResetToStart()
         {
             TravelledMetres = 0;
@@ -91,7 +93,7 @@ namespace PaceScape.RunningTrack
             ApplyPose();
         }
 
-        /// <summary>Advances by elapsed visible time; invalid or nonpositive time and pace leave the object still.</summary>
+        // Advances by elapsed visible time; invalid or nonpositive time and pace leave the object still.
         public void Advance(float deltaTime, float paceMinutesPerKilometre)
         {
             if (!IsFinite(deltaTime) || deltaTime <= 0f)
@@ -130,7 +132,7 @@ namespace PaceScape.RunningTrack
             ApplyPose();
         }
 
-        /// <summary>Uses exact recorded travel while smoothing only the visual gait response.</summary>
+        // Uses exact recorded travel while smoothing only the visual gait response.
         public void AdvanceRecorded(float deltaTime, double travelMetres, double endSpeedMetresPerSecond)
         {
             if (!IsFinite(deltaTime) || deltaTime <= 0 || double.IsNaN(travelMetres) ||
@@ -152,7 +154,7 @@ namespace PaceScape.RunningTrack
             ApplyPose();
         }
 
-        /// <summary>Overrides only visible placement; logical lane travel and gait speed stay independent.</summary>
+        // Overrides only visible placement; logical lane travel and gait speed stay independent.
         public void SetPresentationPose(Pose localFloorPose, bool visible)
         {
             _hasRelativePose = true;
@@ -161,7 +163,7 @@ namespace PaceScape.RunningTrack
             SetRendererVisibility(visible);
         }
 
-        /// <summary>Restores the selected lane at its current logical progress, including initial renderer flags.</summary>
+        // Restores the selected lane at its current logical progress, including initial renderer flags.
         public void ClearPresentationPose()
         {
             if (!_hasRelativePose)
@@ -173,6 +175,7 @@ namespace PaceScape.RunningTrack
             ApplyPose();
         }
 
+        // Hides presentation renderers and restores their original flags when visible.
         private void SetRendererVisibility(bool visible)
         {
             for (int i = 0; i < _renderers.Length; i++)
@@ -189,6 +192,7 @@ namespace PaceScape.RunningTrack
             return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
+        // Maps physical speed to gait blending and playback rate.
         private void UpdateAnimation(float speed)
         {
             if (_animator == null || !_animator.isActiveAndEnabled || !_animator.isInitialized)

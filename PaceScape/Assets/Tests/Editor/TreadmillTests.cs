@@ -1,3 +1,5 @@
+// Checks FTMS parsing, speed freshness, and the ghost's independence from belt input.
+
 using System;
 using System.Collections;
 using System.Reflection;
@@ -6,7 +8,7 @@ using UnityEngine;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Feeds synthetic FTMS notifications through the reused decoder and runner speed source.</summary>
+    // Feeds synthetic FTMS notifications through the reused decoder and runner speed source.
     public sealed class TreadmillTests
     {
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -89,6 +91,39 @@ namespace PaceScape.Tests
         }
 
         [Test]
+        public void SideBySideUsesFreshBeltSpeedAndPausesWhenItExpires()
+        {
+            var trackerRoot = new GameObject("Side By Side tracking gate");
+            trackerRoot.SetActive(false);
+            trackerRoot.transform.SetParent(_root.transform);
+            Component tracker = trackerRoot.AddComponent(RuntimeType("Tracking.TagTracker"));
+            Component performance = trackerRoot.AddComponent(RuntimeType("Performance.RunnerPerformance"));
+            SetField(performance, "_input", _source);
+            tracker.GetType().GetProperty("PerformanceSource").SetValue(tracker, performance);
+            Assert.That(tracker.GetType().GetMethod("TrySetRunnerMode").Invoke(tracker, new object[] { "SideBySide" }), Is.True);
+
+            object session = Field(tracker, "_runSession");
+            PropertyInfo activePace = tracker.GetType().GetProperty("ActivePaceMinutesPerKilometre");
+            PropertyInfo runState = tracker.GetType().GetProperty("RunState");
+            MethodInfo update = tracker.GetType().GetMethod("UpdateVisuals", PrivateInstance);
+            session.GetType().GetMethod("TryStart").Invoke(session, new object[] { true });
+
+            Receive(new byte[] { 0, 0, 0xB0, 4 }); // 12 km/h
+            Assert.That(activePace.GetValue(tracker), Is.EqualTo(5f).Within(0.001f));
+            Receive(new byte[] { 0, 0, 0, 0 }); // Fresh standstill
+            update.Invoke(tracker, null);
+            Assert.That(activePace.GetValue(tracker), Is.EqualTo(0f));
+            Assert.That(runState.GetValue(tracker).ToString(), Is.EqualTo("Running"));
+
+            _channelValue.GetType().GetField("At").SetValue(_channelValue, Time.realtimeSinceStartup - 3f);
+            update.Invoke(tracker, null);
+            Assert.That(runState.GetValue(tracker).ToString(), Is.EqualTo("Paused"));
+            Receive(new byte[] { 0, 0, 0xE8, 3 });
+            update.Invoke(tracker, null);
+            Assert.That(runState.GetValue(tracker).ToString(), Is.EqualTo("Paused"));
+        }
+
+        [Test]
         public void MissingBeltSignalDoesNotPauseTheGhost()
         {
             var trackerRoot = new GameObject("FTMS tracking gate");
@@ -121,7 +156,7 @@ namespace PaceScape.Tests
             Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(6f));
             type.GetMethod("TrySetPace").Invoke(tracker, new object[] { 4f });
             Assert.That(type.GetProperty("ActivePaceMinutesPerKilometre").GetValue(tracker), Is.EqualTo(4f));
-            foreach (string retired in new[] { "FollowInput", "TempoRunner", "SideBySide" })
+            foreach (string retired in new[] { "FollowInput", "TempoRunner" })
             {
                 Assert.That(type.GetMethod("TrySetRunnerMode").Invoke(tracker, new object[] { retired }), Is.False);
             }

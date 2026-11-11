@@ -1,3 +1,5 @@
+// Checks track geometry, runner motion, gait settings, and resource lifetime.
+
 using System;
 using System.Reflection;
 using NUnit.Framework;
@@ -6,7 +8,7 @@ using UnityEngine;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Checks oval geometry and the marker object's shared placement and visibility lifecycle.</summary>
+    // Checks oval geometry and the marker object's shared placement and visibility lifecycle.
     public sealed class RunningTrackTests
     {
         private Type _geometryType;
