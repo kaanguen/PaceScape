@@ -46,6 +46,8 @@ namespace PaceScape.Treadmill
         private int _speedStepUnits;
         private bool _speedRangeReadPending;
 
+        internal bool IsStartingBelt => _controlCompleted != null && _operation == BeltOperation.Start;
+
         // Raised when a disconnect or invalid notification breaks measurement continuity.
         public event Action MeasurementInterrupted;
 

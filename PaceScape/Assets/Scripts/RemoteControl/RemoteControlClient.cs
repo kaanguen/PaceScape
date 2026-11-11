@@ -344,6 +344,11 @@ namespace PaceScape.RemoteControl
                         success = true;
                         error = null;
                     }
+                    else if (message?.commandType == "exercise.startWarmup" && _treadmill != null &&
+                        _treadmill.IsStartingBelt)
+                    {
+                        error = "Wait for the treadmill start command to finish before starting warm-up.";
+                    }
                     else if (message?.commandType is "treadmill.startRun" or "treadmill.resumeRun" or "treadmill.pauseRun" or "treadmill.stopRun" or "treadmill.speed")
                     {
                         if (TryBeginBeltCommand(message, out error))
@@ -503,6 +508,7 @@ namespace PaceScape.RemoteControl
             else
             {
                 _tracker?.TryPauseRun();
+                _tracker?.StopWarmup("ConnectionLost");
             }
         }
 
@@ -534,6 +540,8 @@ namespace PaceScape.RemoteControl
                     startupError = _tracker.StartupError,
                     placedMarkers = _tracker.PlacedMarkerCount,
                     pendingMarkers = _tracker.PendingMarkerCount,
+                    warmupControlVersion = 1,
+                    warmup = _tracker.CaptureWarmup(_treadmill != null && _treadmill.IsStartingBelt),
                     runnerControlVersion = 1,
                     runnerModeControlVersion = 1,
                     ghostControlVersion = 1,

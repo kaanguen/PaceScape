@@ -63,6 +63,8 @@
 
 Für einen visuellen Test mit simuliertem Laufbandtempo öffne außerhalb des Play Mode **PaceScape → Ghost-Vorschau (Testdaten)**. Dort kannst du den PR-Ghost und **Side by Side** ausprobieren.
 
+Unter **PaceScape → Warm-up-Vorschau** kannst du Hampelmänner und Kniebeugen am kleinen Warm-up-Coach in Kamerasicht ansehen. Die App unterstützt frei zusammengestellte Warm-up-Sequenzen vor dem Lauf. [Warm-up und WebSocket-Befehle](docs/remote-control.md#warm-up)
+
 ### Dashboard starten
 
 Im Server-Repository mit **Node.js 22 oder neuer** starten:
