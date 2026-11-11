@@ -1,3 +1,5 @@
+// Decodes profile-selected BLE data and exposes fresh readings to consumers.
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -60,6 +62,7 @@ public class SensorMeasurements : MonoBehaviour
         }
     }
 
+    // Exposes numeric readings only while the decoded sample is fresh.
     private bool TryGetFreshNumber(BleValueFormat format, Func<Value, double> read, out double number)
     {
         number = double.NaN;

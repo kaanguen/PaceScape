@@ -1,3 +1,5 @@
+// Checks calibrated lane placement, visibility, and progress preservation.
+
 using System;
 using System.Reflection;
 using NUnit.Framework;
@@ -5,7 +7,7 @@ using UnityEngine;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Checks presentation-only overtaking, locked calibration and visibility without hardware.</summary>
+    // Checks presentation-only overtaking, locked calibration and visibility without hardware.
     public sealed class TreadmillGhostPresentationTests
     {
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -23,6 +25,20 @@ namespace PaceScape.Tests
             Assert.That(args[1], Is.EqualTo(new Vector3(3, 0, 4)));
         }
 
+        [TestCase(-1.5f)]
+        [TestCase(1.5f)]
+        public void SideBySideUsesTheCalibratedOriginAndSignedOffset(float offset)
+        {
+            object settings = Create("RunningTrack.TreadmillGhostPresentation");
+            Assert.That(Call(settings, "TryConfigure", "Track", offset, 10f), Is.True);
+            Pose lanePose = EvaluateLane(1, 0);
+            Vector3 right = lanePose.rotation * Vector3.right;
+            Vector3 origin = lanePose.position + 2f * right;
+            Pose companion = (Pose)Call(settings, "EvaluateSideBySide", 1, origin);
+            Assert.That(Vector3.Distance(companion.position, origin + offset * right), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(companion.rotation, lanePose.rotation), Is.LessThan(0.01f));
+        }
+
         [TestCase(1, 0.0, -2.0)]
         [TestCase(8, 0.0, 2.0)]
         [TestCase(3, 8.0, 5.0)]
@@ -32,14 +48,32 @@ namespace PaceScape.Tests
         public void RelativeGapFollowsTheSelectedLane(int lane, double reference, double gap)
         {
             object settings = Create("RunningTrack.TreadmillGhostPresentation");
-            Pose referencePose = EvaluateLane(lane, reference);
-            Vector3 calibration = referencePose.position + referencePose.rotation * Vector3.right * 2;
-            object[] args = { lane, calibration, gap, Pose.identity };
+            object[] args = { lane, reference, Pose.identity, gap, Pose.identity };
             Assert.That(Call(settings, "Evaluate", args), Is.True);
-            Pose pose = (Pose)args[3];
+            Pose pose = (Pose)args[4];
             Pose expected = EvaluateLane(lane, reference + gap);
             Assert.That(Vector3.Distance(pose.position, expected.position), Is.LessThan(0.0001f));
             Assert.That(Quaternion.Angle(pose.rotation, expected.rotation), Is.LessThan(0.01f));
+        }
+
+        [TestCase(5.0)]
+        [TestCase(35.0)]
+        [TestCase(435.0)]
+        public void MovingTrackKeepsTheCurrentLaneUnderTheCalibration(double travel)
+        {
+            var origin = new Vector3(2, 0, 1);
+            object[] args = { 1, origin, travel, 0.0 };
+            Type type = RuntimeType("RunningTrack.TreadmillGhostPresentation");
+            Pose track = (Pose)type.GetMethod("EvaluateTrackPose").Invoke(null, args);
+            double currentMetres = (double)args[3];
+            Assert.That(currentMetres, Is.EqualTo(1.0 + travel).Within(0.00001));
+            Pose current = EvaluateLane(1, currentMetres);
+            Assert.That(Vector3.Distance(track.position + track.rotation * current.position, origin), Is.LessThan(0.0001f));
+            Assert.That(Vector3.Angle(track.rotation * current.rotation * Vector3.forward, Vector3.forward), Is.LessThan(0.01f));
+
+            object[] ghost = { 1, currentMetres, track, 0.0, Pose.identity };
+            Assert.That(Call(Create("RunningTrack.TreadmillGhostPresentation"), "Evaluate", ghost), Is.True);
+            Assert.That(Vector3.Distance(((Pose)ghost[4]).position, origin), Is.LessThan(0.0001f));
         }
 
         private static Pose EvaluateLane(int lane, double distance)
@@ -57,9 +91,9 @@ namespace PaceScape.Tests
         public void OnlyFiniteGapsWithinTheConfiguredDistanceAreVisible(double gap, bool expected)
         {
             object settings = Create("RunningTrack.TreadmillGhostPresentation");
-            object[] args = { 1, Vector3.zero, gap, Pose.identity };
+            object[] args = { 1, 0.0, Pose.identity, gap, Pose.identity };
             Assert.That(Call(settings, "Evaluate", args), Is.EqualTo(expected));
-            Assert.That(Mathf.Abs(((Pose)args[3]).position.z), Is.LessThanOrEqualTo(10));
+            Assert.That(Mathf.Abs(((Pose)args[4]).position.z), Is.LessThanOrEqualTo(10));
         }
 
         [Test]
@@ -70,9 +104,9 @@ namespace PaceScape.Tests
             Assert.That(Call(settings, "TryConfigure", "Other", 1.5f, 10f), Is.False);
             Assert.That(Call(settings, "TryConfigure", "Track", 0f, 10f), Is.False);
             Assert.That(Call(settings, "TryConfigure", "Track", 1f, float.NaN), Is.False);
-            object[] evaluation = { 1, Vector3.zero, 9.0, Pose.identity };
+            object[] evaluation = { 1, 0.0, Pose.identity, 9.0, Pose.identity };
             Assert.That(Call(settings, "Evaluate", evaluation), Is.False);
-            Assert.That(((Pose)evaluation[3]).position.z, Is.EqualTo(8).Within(0.0001f));
+            Assert.That(((Pose)evaluation[4]).position.z, Is.EqualTo(8).Within(0.0001f));
             object[] calibration = { new Vector3(float.NaN, 0, 0), Vector3.zero };
             Assert.That(settings.GetType().GetMethod("TryCalibrate").Invoke(null, calibration), Is.False);
         }

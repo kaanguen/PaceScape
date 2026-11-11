@@ -1,3 +1,5 @@
+// Decodes heart rate and optional fields from standard BLE Heart Rate Measurement packets.
+
 using System;
 
 public static class HeartRateParser
@@ -14,6 +16,7 @@ public static class HeartRateParser
     public static int Parse(byte[] packet) { return ParseMeasurement(packet).Bpm; }
 
     // Bluetooth SIG Heart Rate Measurement (2A37), little endian.
+    // Decodes the flag-selected heart rate and optional measurement fields.
     public static Reading ParseMeasurement(byte[] packet)
     {
 

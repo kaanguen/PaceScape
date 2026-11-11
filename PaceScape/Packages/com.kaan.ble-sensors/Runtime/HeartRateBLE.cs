@@ -1,3 +1,5 @@
+// Uses the shared BLE connection with heart-rate profile defaults.
+
 using UnityEngine;
 
 // Compatibility component: keep the original script GUID and serialized references.

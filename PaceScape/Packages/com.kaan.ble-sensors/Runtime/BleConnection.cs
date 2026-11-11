@@ -1,3 +1,5 @@
+// Manages BLE scanning, connections, and GATT operations for a device profile.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -31,7 +33,7 @@ public class BleConnection : MonoBehaviour
     }
     public void Read(string service, string characteristic) => Enqueue(service,characteristic,false,1);
     public void Subscribe(string service,string characteristic,BleUpdateMode mode = BleUpdateMode.NotifyPreferred) => Enqueue(service,characteristic,true,(int)mode);
-    /// <summary>Sends a write only when the existing read and subscription queue is idle.</summary>
+    // Sends a write only when the existing read and subscription queue is idle.
     public bool TryWriteIdle(string service, string characteristic, byte[] data)
     {
         if (!Connected || operations?.Idle != true || !HasCharacteristic(service, characteristic))
@@ -106,6 +108,7 @@ public class BleConnection : MonoBehaviour
 #endif
     }
 
+    // Checks scan prerequisites before requesting device discovery.
     public bool TryStartScan(out string error)
     {
         error = null;
@@ -225,6 +228,7 @@ public class BleConnection : MonoBehaviour
         if (Busy || Connected || index < 0 || index >= DeviceIds.Count) return;
         SelectedIndex = index; Notify();
     }
+    // Validates the selected device before starting a GATT connection.
     public bool TryConnectDevice(string deviceId, out string error)
     {
         error = null;

@@ -1,3 +1,5 @@
+// Bridges queued GATT operations to Android's native BLE plugin.
+
 using System;
 using UnityEngine;
 

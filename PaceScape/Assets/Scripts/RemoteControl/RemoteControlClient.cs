@@ -1,3 +1,5 @@
+// Connects the scene to the dashboard and routes commands, telemetry, and preview frames.
+
 using System;
 using System.Collections.Concurrent;
 using System.IO;
@@ -13,7 +15,7 @@ using UnityEngine;
 
 namespace PaceScape.RemoteControl
 {
-    /// <summary>Connects the active tracking scene to the local control server without a scene asset change.</summary>
+    // Connects the active tracking scene to the local control server without a scene asset change.
     [DisallowMultipleComponent]
     public sealed class RemoteControlClient : MonoBehaviour
     {
@@ -134,7 +136,7 @@ namespace PaceScape.RemoteControl
             LoadConnectionSettings();
         }
 
-        /// <summary>Pauses movement, cancels the old socket and reloads project defaults before reconnecting.</summary>
+        // Pauses movement, cancels the old socket and reloads project defaults before reconnecting.
         public void ReloadConnectionSettings()
         {
             PauseTarget();
@@ -314,6 +316,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
+        // Applies a queued dashboard command on the Unity main thread.
         private void ApplyCommand(IncomingCommand incoming)
         {
             string commandId = null;
@@ -369,6 +372,7 @@ namespace PaceScape.RemoteControl
             SendAcknowledgement(_session, commandId, success, error);
         }
 
+        // Checks command eligibility before starting an asynchronous FTMS operation.
         private bool TryBeginBeltCommand(RemoteMessage message, out string error)
         {
             if (_treadmill == null || !CanUseMotorControl() || message.payload == null)
@@ -534,6 +538,7 @@ namespace PaceScape.RemoteControl
                     runnerModeControlVersion = 1,
                     ghostControlVersion = 1,
                     ghostPresentationVersion = 1,
+                    sideBySideVersion = 1,
                     ghostPresentation = _tracker.CaptureGhostPresentation(),
                     runnerMode = _tracker.Mode.ToString(),
                     comparisonControlVersion = 1,
@@ -556,6 +561,7 @@ namespace PaceScape.RemoteControl
             });
         }
 
+        // Owns the WebSocket and coordinates send and receive tasks until the session ends.
         private static async Task RunSessionAsync(ConnectionSession session, Uri uri, string hello)
         {
             Task sending = null;
@@ -610,6 +616,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
+        // Sends queued text and consumes the latest available camera frame.
         private static async Task SendLoopAsync(ConnectionSession session)
         {
             CancellationToken token = session.Cancellation.Token;
@@ -644,6 +651,7 @@ namespace PaceScape.RemoteControl
                 session.Cancellation.Token).ConfigureAwait(false);
         }
 
+        // Assembles WebSocket messages and queues them for main-thread processing.
         private static async Task ReceiveLoopAsync(ConnectionSession session)
         {
             byte[] buffer = new byte[16384];

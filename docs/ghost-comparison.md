@@ -4,12 +4,13 @@ The PR ghost replays the measured speed trace of a fully completed treadmill eff
 
 ## Ghost modes and workflow
 
-The avatar is an independent ghost. Its pacing reference is separate from placement: it may follow the anchored oval or appear beside a calibrated treadmill position. There are exactly two pacing references:
+The avatar is an independent ghost. Its pacing reference is separate from placement: it may follow the anchored oval or appear beside a calibrated treadmill position. The runner supports three pace sources:
 
 | Ghost reference | Source |
 | --- | --- |
 | `FixedPace` (default) | The preset pace/speed slider, unchanged by live belt speed and current-run results |
 | `AllTimePersonalBest` | The selected-distance PR trace, followed by longer stored PR sections; average pace for legacy records |
+| `SideBySide` | Fresh FTMS belt speed, with the avatar held beside the calibrated treadmill position |
 
 1. Install the ghost-only Android build, restart Control, and select **Ghost · voreingestelltes Tempo** or **Ghost · All-time PRs** under **Ghost einstellen**.
 2. Set preset speed, lane and start position as before. For PR comparison choose 400 m or a custom kilometre distance. A distance change requires reset; mode changes pause without rewinding.
@@ -18,6 +19,16 @@ The avatar is an independent ghost. Its pacing reference is separate from placem
 5. All-time mode uses the persisted distance record. When none exists, it retains the preset fallback or an explicitly enabled, labelled example. A new faster real PR updates the stored record; the active playback snapshot stays unchanged until reinitialized, and FixedPace is never overridden.
 
 A measurement lap is a fixed block of the selected distance. Rolling best efforts can start between lap boundaries. The current selected distance is evaluated for that run; historical activities are not retained for retrospective evaluation of other distances. No side-by-side behavior, head-following position or new user-relative placement/calibration was added. The ghost keeps the existing independent lane path and configured starting offset.
+
+## Side by Side
+
+Send `runner.mode` with `{"runnerMode":"SideBySide"}` in the payload on a reset tracking session with at most one placed or pending marker. Use `runner.calibrate` while standing on the treadmill with one tracked marker. The companion faces the selected lane tangent and uses the signed side offset from `runner.presentation` (positive to the right, default 1.5 m). Start and resume require a calibrated position and fresh FTMS speed. A fresh zero speed keeps the session active at standstill. Stale or missing speed pauses the companion session until an explicit resume. Belt speed drives the gait target through the existing animation smoothing. User distance, laps and records still come from belt samples.
+
+Tracking clients advertise `sideBySideVersion: 1` and report `runnerMode` and effective presentation mode as `SideBySide`. A dashboard selector requires support in the separate Control project. The marker-free test scene rejects this mode because it lacks treadmill calibration.
+
+The oval moves underneath the calibrated treadmill position in Side by Side and TreadmillRelative. It follows measured belt distance, stays still at standstill, pauses with the session and returns to the calibrated start on reset. Missing speed adds no distance. The spatial anchor remains fixed. On bends, the oval rotates around the user's position to keep the current lane tangent aligned with the initial treadmill heading. Stadium presentation keeps its fixed oval.
+
+Unity 2022.3.62f3 passed all 147 PaceScape EditMode cases. In the 3D preview, a 5 s step at 10.8 km/h moved the Side by Side track 15 m while the blue user marker and companion stayed in place. A step at 0 km/h held the track, and reset returned the start marking. The independent ghost preview also showed the track moving with the simulated belt distance. This verification used simulated data in the Editor.
 
 ## Measurement definition
 
@@ -42,7 +53,7 @@ Fictional examples are separate constants: 400 m in 120 s, 5 km in 1,500 s, and 
 - `PersonalBestBook.cs`: versioned, exact-distance measured records and strictly faster updates.
 - `RunnerPerformance.cs`: scene-owned sampling, target selection, storage and telemetry. It binds to the runtime client, tracker and treadmill input without serialized scene changes.
 - `TagTracker` / `ServerTestScene`: apply the selected comparison target through existing `RunningTrackMotion`; explicit reset clears session statistics. Preview has no real BLE measurements, but supports demonstration targets.
-- State advertises `comparisonControlVersion: 1`, `activeRunnerPace`, and a `performance` object. `runner.comparison` requires `{ "comparisonDistanceMetres": 5000, "useDemoRecords": false }`. `runner.mode` accepts exactly `FixedPace` and `AllTimePersonalBest`. State additionally advertises `ghostControlVersion: 1`; older mirror/current-run builds must be updated before the ghost controls are enabled.
+- State advertises `comparisonControlVersion: 1`, `activeRunnerPace`, and a `performance` object. `runner.comparison` requires `{ "comparisonDistanceMetres": 5000, "useDemoRecords": false }`. `runner.mode` accepts `FixedPace`, `AllTimePersonalBest`, and `SideBySide` on capable clients. State additionally advertises `ghostControlVersion: 1`; older mirror/current-run builds must be updated before the ghost controls are enabled.
 - Control's simulator advertises the capability and can exercise configuration/demo display, but never creates measured PRs or simulates real BLE by itself.
 
 ## Verification
@@ -51,9 +62,9 @@ Fictional examples are separate constants: 400 m in 120 s, 5 km in 1,500 s, and 
 
 Final validation: 109/109 EditMode tests passed, none skipped; 19/19 server/simulator tests passed in the updated Control project. Browser checks verified 5 km example selection, explicit all-time mode, visible 25:00 / 5:00 min/km example target and separation from the empty measured record table. Telemetry caps the displayed history to 20 laps and 32 PR rows (including the selected distance), with the full real book retained locally, to respect the existing relay message limit. No new C# errors were reported by Unity MCP; device verification remains pending.
 
-## Ghost-only scope correction
+## Earlier ghost-only scope
 
-The user narrowed avatar behavior to preset or all-time PR only. Retired modes `FollowInput` and `TempoRunner` and the BLE-to-avatar source API were removed. Measurement and persistence remain intact. No measured user result is inferred from the ghost. Updated regressions check the fixed default, rejection of old/side-by-side modes, independence from belt stop/disconnect/current-run bests, and retained all-time targets. Hardware behavior remains pending.
+Before Side by Side was introduced, avatar pace came from a preset or all-time PR. Retired modes `FollowInput` and `TempoRunner` and the BLE-to-avatar source API were removed. Measurement and persistence remain intact. No measured user result is inferred from the ghost. Updated regressions check the fixed default, rejection of old/side-by-side modes, independence from belt stop/disconnect/current-run bests, and retained all-time targets. Hardware behavior remains pending.
 
 ## Dynamic PR replay — 2026-11-06
 
@@ -77,6 +88,8 @@ Editor follow-up: the running Unity 2022.3.62f3 Editor imported the scripts and 
 
 Open **PaceScape > Ghost-Vorschau (Testdaten)** outside Play mode. The window renders the existing Jogger and track in an unsaved preview scene. **Start/Pause** controls continuous animation, **5 s weiter** advances a deterministic step and pauses, and **Zurücksetzen** returns the runner to its start. Focus must stay on this window during continuous playback; time spent away or in long Editor stalls does not advance it.
 
+To check the adaptive gait and placement, enable **Side by Side (adaptives Laufbandtempo)** and **Übersicht statt Blick vom Laufband**. Start playback and try 5, 12 and 0 km/h with the simulated speed slider. Expect the animation to adjust, settle into idle at zero and stay 1.5 m to the right of the blue treadmill marker throughout. A 5 s step at 12 km/h adds about 16.67 m of simulated distance. Switching modes pauses and resets playback. The preview exercises the production motion and placement classes with a synthetic origin and speed. For FTMS freshness and pause behavior, run `SideBySideUsesFreshBeltSpeedAndPausesWhenItExpires` in the EditMode Test Runner.
+
 The synthetic 20 m trace is 0 m at 0 s, 8 m at 4 s and 20 m at 8 s. The synthetic 40 m trace is 0 m at 0 s, 20 m at 8 s, 26 m at 11 s and 40 m at 14 s. The ghost enters the second trace at 20 m, then retains its final 4.6667 m/s when no longer reference exists. Three successive 5-second steps from reset show 11 m / 10.8 km/h / reference 20 m, then 24 m / 7.2 km/h / reference 40 m, then 44.6667 m / 16.8 km/h / HoldingSpeed. The short distances and speeds are test fixtures, not training recommendations.
 
 The preview uses the real replay/motion classes and existing Animator, with explicit Editor animation evaluation. It does not instantiate `RunnerPerformance`, BLE or `RemoteControlClient`, does not read/write user records and does not save a scene. Its manual Editor clock is separate from live Play-mode tracking/transport timing. The UI uses UI Toolkit with a standard IMGUI preview surface; this renderer-specific interop is limited to the Editor window.
@@ -87,7 +100,7 @@ Observed in Unity 2022.3.62f3: all three deterministic steps, continuously chang
 
 This supersedes the earlier placement-only scope: the user authorized the same independent ghost to appear beside their fixed treadmill position. It does not add a pacing mode or make the ghost adopt live belt speed. In Control, open **Konfiguration > Ghost einstellen > Ghost-Darstellung**, choose **Stadion** or **Laufband**, and apply while Ready. The selector keeps the side offset and visibility distance reported by the app. After exactly one marker is placed and tracked, stand at the intended treadmill position and explicitly calibrate. The floor point beneath the head is stored in anchor-local coordinates. The nearest point on the selected lane centerline defines zero relative gap. The lane determines heading, independently of the user's gaze. Relative mode uses one marker and requires calibration plus fresh belt data for start/resume. The original track presentation remains the default and does not acquire these input requirements.
 
-The floor-local pose is sampled along the selected lane at `nearestLaneMetres + ghostProgress - userProgress - startOffset`. The lane tangent sets the heading through bends. Progress uses the established first-fresh-measurement comparison origin; the existing configured start offset is retained. In relative mode dashboard `userLeadMetres` includes this offset so the displayed lead and longitudinal position agree. Ghost reference playback/gait remain independent of user speed: overtaking changes relative position only, without turning the runner or reversing its animation. The lane coordinate wraps around the oval. The signed gap used for visibility is unwrapped. This means relative physical movement and animated leg velocity have different meanings, as with a runner being overtaken.
+The user's lane coordinate advances from the nearest calibrated lane point by measured belt distance. The track transform aligns that current lane point and tangent to the fixed treadmill position and heading. The relative ghost is sampled at the user's current lane coordinate plus the signed gap minus the start offset, then placed using the same transform as the track. The comparison uses the first fresh measurement as its ghost progress origin. In relative mode dashboard `userLeadMetres` includes the start offset. Ghost playback and gait remain independent of belt speed. The lane coordinate wraps around the oval, and the signed gap used for visibility is unwrapped.
 
 The signed side offset is retained on the wire for compatibility. The selected lane centerline determines the lateral position. Visibility defaults to 10 m in either longitudinal direction and is configurable from 1–100 m. These are editable display/engineering choices, not training prescriptions. Per the user's choice, a gap beyond the configured limit hides only the runner renderer; logical progress continues. Renderers are restored within range without changing independent progress. Original disabled renderer flags are preserved. Existing head/anchor/content gates still apply. Unknown measurement gaps suppress relative placement until reset rather than estimating missing user motion. Pause freezes the last presented pose; after an interrupted measurement, resuming requires reset for a new continuous relative comparison. Stop/retry/new anchors discard calibration. Display settings/calibration are not persisted across app launches.
 

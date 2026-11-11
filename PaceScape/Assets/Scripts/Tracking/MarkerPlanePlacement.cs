@@ -1,3 +1,5 @@
+// Queries detected planes and projects marker poses onto usable placement surfaces.
+
 using MagicLeap.OpenXR.Features.Planes;
 using MagicLeap.OpenXR.Subsystems;
 using Unity.Collections;
@@ -8,9 +10,7 @@ using UnityEngine.XR.ARSubsystems;
 
 namespace PaceScape.Tracking
 {
-    /// <summary>
-    /// Queries nearby Magic Leap planes and projects marker poses onto matching boundaries.
-    /// </summary>
+    // Queries nearby Magic Leap planes and projects marker poses onto matching boundaries.
     [DisallowMultipleComponent]
     public sealed class MarkerPlanePlacement : MonoBehaviour
     {
@@ -26,19 +26,19 @@ namespace PaceScape.Tracking
         [Tooltip("Minimum absolute dot product between marker and surface normals.")]
         private float _minimumNormalAlignment = 0.9f;
 
-        /// <summary>Gets whether placement uses classified floors rather than strict surface matching.</summary>
+        // Gets whether placement uses classified floors rather than strict surface matching.
         public bool PlaceOnFloor => _placeOnFloor;
 
-        /// <summary>Gets the plane query padding in metres.</summary>
+        // Gets the plane query padding in metres.
         public float QueryPadding => _queryPadding;
 
-        /// <summary>Gets the strict-mode maximum marker-to-surface distance in metres.</summary>
+        // Gets the strict-mode maximum marker-to-surface distance in metres.
         public float MaxMarkerPlaneDistance => _maxMarkerPlaneDistance;
 
-        /// <summary>Gets the strict-mode minimum absolute normal alignment.</summary>
+        // Gets the strict-mode minimum absolute normal alignment.
         public float MinimumNormalAlignment => _minimumNormalAlignment;
 
-        /// <summary>Updates plane settings; the caller must restart active tracking to rebuild the query.</summary>
+        // Updates plane settings; the caller must restart active tracking to rebuild the query.
         public bool TryConfigure(bool placeOnFloor, float queryPadding, float maxMarkerPlaneDistance,
             float minimumNormalAlignment)
         {
@@ -71,14 +71,12 @@ namespace PaceScape.Tracking
             OutsideBoundary
         }
 
-        /// <summary>Reports whether the Magic Leap plane subsystem is running.</summary>
+        // Reports whether the Magic Leap plane subsystem is running.
         public bool IsSubsystemRunning => _isInitialized && isActiveAndEnabled && _planeManager != null &&
             _planeManager.isActiveAndEnabled && _planeManager.subsystem is MLXrPlaneSubsystem &&
             _planeManager.subsystem.running;
 
-        /// <summary>
-        /// Prepares the manager without scanning before spatial mapping permission is granted.
-        /// </summary>
+        // Prepares the manager without scanning before spatial mapping permission is granted.
         public bool Initialize(XROrigin xrOrigin, out string error)
         {
             error = null;
@@ -130,7 +128,7 @@ namespace PaceScape.Tracking
             return true;
         }
 
-        /// <summary>Starts plane updates after permissions and OpenXR features have been checked.</summary>
+        // Starts plane updates after permissions and OpenXR features have been checked.
         public void StartSubsystem()
         {
             if (!_isInitialized || _planeManager == null || _trackingOrigin == null || _xrOrigin.Camera == null)
@@ -143,9 +141,7 @@ namespace PaceScape.Tracking
             _planeManager.enabled = true;
         }
 
-        /// <summary>
-        /// Finds the nearest tracked surface containing the projected marker center.
-        /// </summary>
+        // Finds the nearest tracked surface containing the projected marker center.
         public bool TryGetPlacementPose(Pose markerWorldPose, out Pose placementPose)
         {
             placementPose = default;
@@ -264,6 +260,7 @@ namespace PaceScape.Tracking
             return hasPlacement;
         }
 
+        // Updates the plane search region around the supplied bounds.
         private void SetQuery(Bounds bounds)
         {
             if (!IsFinitePose(new Pose(bounds.center, Quaternion.identity)) || !IsFinite(bounds.extents.sqrMagnitude))
@@ -315,7 +312,7 @@ namespace PaceScape.Tracking
             }
         }
 
-        /// <summary>Queries the current pending marker positions in tracking space, without accumulating old poses.</summary>
+        // Queries the current pending marker positions in tracking space, without accumulating old poses.
         public void UpdateMarkerQuery(Bounds pendingMarkerBounds)
         {
             if (_isInitialized)
@@ -324,6 +321,7 @@ namespace PaceScape.Tracking
             }
         }
 
+        // Projects a marker vertically onto a floor candidate.
         private static ProjectionResult TryProjectFloor(Pose marker, Pose plane,
             PlaneClassification classification, PlaneAlignment alignment, NativeArray<Vector2> boundary,
             out Pose placement)
@@ -358,6 +356,7 @@ namespace PaceScape.Tracking
             return TryCreatePlacement(marker, plane, boundary, projected, normal, out placement);
         }
 
+        // Checks a surface candidate against strict placement limits.
         private static ProjectionResult TryProjectMarker(Pose marker, Pose plane, NativeArray<Vector2> boundary,
             float maxDistance, float minimumAlignment, out Pose placement)
         {
@@ -465,9 +464,7 @@ namespace PaceScape.Tracking
             return isInside;
         }
 
-        /// <summary>
-        /// Stops scanning when the tracker is disabled or loses its permissions.
-        /// </summary>
+        // Stops scanning when the tracker is disabled or loses its permissions.
         public void StopScanning()
         {
             if (_isInitialized && _planeManager != null)
@@ -480,7 +477,7 @@ namespace PaceScape.Tracking
             _xrOrigin = null;
         }
 
-        /// <summary>Rejects invalid device poses before they can reach a native query or an anchor.</summary>
+        // Rejects invalid device poses before they can reach a native query or an anchor.
         internal static bool IsFinitePose(Pose pose)
         {
             Quaternion rotation = pose.rotation;

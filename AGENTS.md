@@ -2,6 +2,8 @@
 
 Unity/C# project for AR running training, currently in its initial setup stage. Read [README.md](README.md) for the product overview and current status. Technical setup and verification notes are in [docs/tracking-setup.md](docs/tracking-setup.md); README branding assets are in `docs/assets/`. All paths below are relative to the repository root.
 
+The README uses light and dark variants of the PaceScape Control wordmark. The launcher icon uses the same AR runner symbol at `PaceScape/Assets/Art/Icons/PaceScapeAppIcon.png`; preserve its `.meta` when refreshing the artwork so the existing Player Settings references still resolve.
+
 ## Project context and layout
 
 - `PaceScape/` is the Unity project; the repository root contains documentation and Git configuration. Open the Unity project subfolder, not the repository root.
@@ -75,11 +77,11 @@ The dashboard runner-panel speed slider converts km/h to pace and automatically 
 
 ## FTMS treadmill input
 
-`PaceScape/Assets/Scripts/Treadmill/TreadmillInput.cs` reuses the embedded user BLE package and pinned Velorexe revision. Fresh belt speed feeds user distance, laps and real personal bests. It never selects or gates ghost speed. `treadmill.manual`, `FollowTreadmill`, and `GetRunnerPace` have been removed from this wrapper. Opt-in `treadmill.startRun` starts the ghost after the stopped belt acknowledges FTMS start. `treadmill.speed` adjusts a moving belt within its reported FTMS range. Pause freezes the ghost after FTMS acknowledgement. Stop resets the ghost immediately on receipt while confirming motor stop separately. Both remain available without fresh speed telemetry. Resume of a stopped belt requires fresh zero-speed telemetry and a paused, tracked session. Motor operations require a local dashboard on the server Mac, explicitly enabled USB loopback or opt-in WLAN on both endpoints, and a matching FTMS response. Commands never retry automatically. See `docs/treadmill.md`; hardware verification remains pending.
+`PaceScape/Assets/Scripts/Treadmill/TreadmillInput.cs` reuses the embedded user BLE package and pinned Velorexe revision. Fresh belt speed feeds user distance, laps and real personal bests. Fresh FTMS speed also drives and gates SideBySide; FixedPace and AllTimePersonalBest retain their own pace sources. `treadmill.manual`, `FollowTreadmill`, and `GetRunnerPace` have been removed from this wrapper. Opt-in `treadmill.startRun` starts the ghost after the stopped belt acknowledges FTMS start. `treadmill.speed` adjusts a moving belt within its reported FTMS range. Pause freezes the ghost after FTMS acknowledgement. Stop resets the ghost immediately on receipt while confirming motor stop separately. Both remain available without fresh speed telemetry. Resume of a stopped belt requires fresh zero-speed telemetry and a paused, tracked session. Motor operations require a local dashboard on the server Mac, explicitly enabled USB loopback or opt-in WLAN on both endpoints, and a matching FTMS response. Commands never retry automatically. See `docs/treadmill.md`; hardware verification remains pending.
 
 ## Independent Tempo Runner
 
-The avatar is a ghost with exactly two references: `RunningSession.RunnerMode.FixedPace` (default) and `AllTimePersonalBest`. `runner.mode` accepts only those exact names and the dashboard requires `ghostControlVersion: 1`. Fixed pace never adopts current-run bests or live belt speed. All-time mode uses the distance-specific persisted PR, retaining the existing explicit demo/target fallback when no measured PR exists. Mode changes pause without rewinding. The user subsequently authorized a treadmill-relative presentation of this same ghost; it is a separate display setting, not a third pacing mode. Do not reintroduce retired FollowInput/TempoRunner modes.
+The avatar supports `FixedPace` (default), `AllTimePersonalBest`, and `SideBySide` through `runner.mode`. The first two use preset pace or stored PRs and retain their optional treadmill-relative presentation. SideBySide uses fresh FTMS speed and holds a signed lateral offset from the calibrated treadmill position. Entering SideBySide requires Ready and at most one marker; starting and resuming require calibration and fresh input. Signal loss pauses the run. Tracking clients advertise `sideBySideVersion: 1`; the marker-free test scene does not support this mode.
 
 ## Distance efforts and personal bests
 
@@ -95,9 +97,13 @@ The avatar is a ghost with exactly two references: `RunningSession.RunnerMode.Fi
 
 ## Editor ghost preview
 
+The preview also offers **Side by Side (adaptives Laufbandtempo)**. Synthetic belt speed drives the production gait path and `TreadmillGhostPresentation.EvaluateSideBySide` keeps the avatar beside the fixed synthetic treadmill origin. Mode switches pause and reset playback. The EditMode treadmill test covers FTMS sample freshness separately.
+
 `Assets/Editor/GhostReplayPreviewWindow.cs` and its USS expose **PaceScape > Ghost-Vorschau (Testdaten)**. It uses UI Toolkit controls and the standard IMGUI 3D preview surface (`PreviewRenderUtility`), with the production `GhostReplay`, `RunningTrackMotion`, Jogger prefab and track in an isolated unsaved preview scene. Fictitious 20 m/40 m traces demonstrate speed changes, reference chaining and final-speed holding; these are technical preview fixtures, not training parameters or real records. It never creates a transport client or record file and never modifies the open scene. Playback advances only while this window is focused; long Editor stalls do not catch up. Closing/reloading releases the preview and its generated resources. Visual Editor checks completed for stepping, continuous movement/animation, pause and reset; this is not an end-to-end server or hardware test.
 
 ## Treadmill-relative ghost presentation
+
+In `TreadmillRelative` and `SideBySide`, the visible oval moves according to measured belt distance. Its selected lane point and tangent are transformed to the fixed calibrated treadmill position and heading. `TagTracker` moves only the track child under the anchor, and the Editor preview uses the same transform with synthetic distance. Pause holds the pose, and reset rewinds the track. Stadium mode retains its marker-aligned oval.
 
 `Assets/Scripts/RunningTrack/TreadmillGhostPresentation.cs` maps progress difference along the selected lane centerline. `runner.presentation` selects `Track` (default) or `TreadmillRelative`, with explicit signed side offset and visibility distance; `runner.calibrate` locks the floor point below the tracked head. Its nearest point on the selected lane is the zero-gap reference, and the lane tangent sets the ghost heading. Configuration/calibration require Ready and exactly one placement; relative mode limits new placements to one. Calibration is anchor-local and never follows subsequent head turns. It is lost with tracking teardown. Settings are session-local. Relative start/resume requires fresh belt input; an already running ghost keeps its independent logical speed if input is lost, while invalid relative placement is hidden until reset. A deliberate pause freezes the last presented pose.
 

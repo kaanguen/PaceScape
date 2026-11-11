@@ -1,10 +1,12 @@
+// Checks project defaults and validation of dashboard server URLs.
+
 using System;
 using NUnit.Framework;
 using UnityEngine;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Checks connection defaults and address validation without opening sockets or writing assets.</summary>
+    // Checks connection defaults and address validation without opening sockets or writing assets.
     public sealed class RemoteControlSettingsTests
     {
         private ScriptableObject _settings;

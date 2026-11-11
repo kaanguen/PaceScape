@@ -1,9 +1,11 @@
+// Finds the fastest continuous effort over a fixed distance from belt samples.
+
 using System;
 using System.Collections.Generic;
 
 namespace PaceScape.Performance
 {
-    /// <summary>Finds the exact fastest window of a selected distance on a piecewise constant speed trace.</summary>
+    // Finds the exact fastest window of a selected distance on a piecewise constant speed trace.
     public sealed class RollingDistanceBest
     {
         private struct Point
@@ -27,7 +29,7 @@ namespace PaceScape.Performance
         private double _bestStartDistance;
         private bool _isReportingBest;
 
-        /// <summary>Copies the winning window during Improved, before old interpolation points are pruned.</summary>
+        // Copies the winning window during Improved, before old interpolation points are pruned.
         public List<EffortPoint> CopyImprovedTrace()
         {
             if (!_isReportingBest)
@@ -55,14 +57,14 @@ namespace PaceScape.Performance
             return trace;
         }
 
-        /// <summary>Gets the best complete continuous effort, or zero before a result.</summary>
+        // Gets the best complete continuous effort, or zero before a result.
         public double BestSeconds { get; private set; }
-        /// <summary>Gets whether the bounded trace capacity has been exhausted.</summary>
+        // Gets whether the bounded trace capacity has been exhausted.
         public bool CapacityExceeded { get; private set; }
-        /// <summary>Raised when a complete continuous window improves the session record.</summary>
+        // Raised when a complete continuous window improves the session record.
         public event Action<double, double> Improved;
 
-        /// <summary>Begins a session for an already validated distance.</summary>
+        // Begins a session for an already validated distance.
         public void Reset(double distance)
         {
             if (double.IsNaN(distance) || double.IsInfinity(distance) || distance < 1 || distance > 1000000)
@@ -74,7 +76,7 @@ namespace PaceScape.Performance
             Interrupt();
         }
 
-        /// <summary>Breaks the continuous trace across unknown intervals while retaining completed records.</summary>
+        // Breaks the continuous trace across unknown intervals while retaining completed records.
         public void Interrupt()
         {
             _points.Clear();
@@ -85,7 +87,7 @@ namespace PaceScape.Performance
             CapacityExceeded = false;
         }
 
-        /// <summary>Includes zero-speed time and evaluates both ends of each speed-change boundary.</summary>
+        // Includes zero-speed time and evaluates both ends of each speed-change boundary.
         public void Advance(double seconds, double speedKmh)
         {
             if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds <= 0 ||
@@ -137,6 +139,7 @@ namespace PaceScape.Performance
             }
         }
 
+        // Locates the sample interval containing the start of the effort.
         private int FindStart(double distance)
         {
             int low = 0;
@@ -156,6 +159,7 @@ namespace PaceScape.Performance
             return Math.Max(0, low - 1);
         }
 
+        // Interpolates the start time for a full-distance effort ending at the given point.
         private void Evaluate(double endDistance, double endTime)
         {
             double startDistance = endDistance - _length;

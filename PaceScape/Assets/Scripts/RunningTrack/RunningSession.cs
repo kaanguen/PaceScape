@@ -1,9 +1,11 @@
+// Manages explicit run states and selects the ghost's pace reference.
+
 namespace PaceScape.RunningTrack
 {
-    /// <summary>Gates runner movement independently from marker detection and anchor visibility.</summary>
+    // Gates runner movement independently from marker detection and anchor visibility.
     public sealed class RunningSession
     {
-        /// <summary>Explicit operator-controlled running states.</summary>
+        // Explicit operator-controlled running states.
         public enum RunState
         {
             Ready,
@@ -11,17 +13,18 @@ namespace PaceScape.RunningTrack
             Paused
         }
 
-        /// <summary>Selects the ghost's independent reference; user measurements never drive avatar speed directly.</summary>
+        // Selects a preset pace, a personal best, or live belt speed.
         public enum RunnerMode
         {
             FixedPace = 1,
-            AllTimePersonalBest = 2
+            AllTimePersonalBest = 2,
+            SideBySide = 3
         }
 
-        /// <summary>Gets the selected speed mode; resets retain this operator setting.</summary>
+        // Gets the selected speed mode; resets retain this operator setting.
         public RunnerMode Mode { get; private set; } = RunnerMode.FixedPace;
 
-        /// <summary>Changes mode atomically, pausing an active run without resetting its position.</summary>
+        // Changes mode atomically, pausing an active run without resetting its position.
         public bool TrySetMode(string mode)
         {
             RunnerMode selected;
@@ -32,6 +35,9 @@ namespace PaceScape.RunningTrack
                     break;
                 case nameof(RunnerMode.AllTimePersonalBest):
                     selected = RunnerMode.AllTimePersonalBest;
+                    break;
+                case nameof(RunnerMode.SideBySide):
+                    selected = RunnerMode.SideBySide;
                     break;
                 default:
                     return false;
@@ -45,10 +51,10 @@ namespace PaceScape.RunningTrack
             return true;
         }
 
-        /// <summary>Gets the current running state; new sessions wait for an explicit start.</summary>
+        // Gets the current running state; new sessions wait for an explicit start.
         public RunState State { get; private set; } = RunState.Ready;
 
-        /// <summary>Starts only a ready session with tracked content.</summary>
+        // Starts only a ready session with tracked content.
         public bool TryStart(bool canRun)
         {
             if (State != RunState.Ready || !canRun)
@@ -60,7 +66,7 @@ namespace PaceScape.RunningTrack
             return true;
         }
 
-        /// <summary>Pauses a running session without changing runner positions.</summary>
+        // Pauses a running session without changing runner positions.
         public bool TryPause()
         {
             if (State != RunState.Running)
@@ -72,7 +78,7 @@ namespace PaceScape.RunningTrack
             return true;
         }
 
-        /// <summary>Resumes only a paused session with recovered tracked content.</summary>
+        // Resumes only a paused session with recovered tracked content.
         public bool TryResume(bool canRun)
         {
             if (State != RunState.Paused || !canRun)
@@ -84,13 +90,13 @@ namespace PaceScape.RunningTrack
             return true;
         }
 
-        /// <summary>Returns to the waiting state; the owner resets its runner transforms separately.</summary>
+        // Returns to the waiting state; the owner resets its runner transforms separately.
         public void Reset()
         {
             State = RunState.Ready;
         }
 
-        /// <summary>Advances visible content only while an explicit running session is active.</summary>
+        // Advances visible content only while an explicit running session is active.
         public void Advance(RunningTrackMotion motion, float deltaTime, float paceMinutesPerKilometre)
         {
             if (State == RunState.Running)

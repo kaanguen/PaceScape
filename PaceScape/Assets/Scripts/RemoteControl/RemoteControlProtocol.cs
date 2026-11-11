@@ -1,3 +1,5 @@
+// Defines dashboard messages and dispatches validated command payloads.
+
 using System;
 using PaceScape.Performance;
 using PaceScape.RunningTrack;
@@ -71,6 +73,7 @@ namespace PaceScape.RemoteControl
         public int runnerModeControlVersion;
         public int ghostControlVersion;
         public int ghostPresentationVersion;
+        public int sideBySideVersion;
         public GhostPresentationState ghostPresentation;
         public string runnerMode;
         public int comparisonControlVersion;
@@ -91,10 +94,10 @@ namespace PaceScape.RemoteControl
         public float minimumNormalAlignment;
     }
 
-    /// <summary>Validates and dispatches supported commands on Unity's main thread.</summary>
+    // Validates and dispatches supported commands on Unity's main thread.
     public static class RemoteControlCommands
     {
-        /// <summary>Applies BLE commands without routing them through marker or test-scene configuration.</summary>
+        // Applies BLE commands without routing them through marker or test-scene configuration.
         public static bool TryApplyTreadmill(string json, TreadmillInput treadmill, out string error)
         {
             error = "A treadmill command ID, payload and active input are required.";
@@ -121,7 +124,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
-        /// <summary>Applies the same wire commands to the marker-free scene target.</summary>
+        // Applies the same wire commands to the marker-free scene target.
         public static bool TryApplyTestScene(string json, ServerTestScene scene, out string error)
         {
             error = "The test scene is unavailable or the command is malformed.";
@@ -148,7 +151,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
-        /// <summary>Applies one JSON command; success means applied or startup requested, not device readiness.</summary>
+        // Applies one JSON command; success means applied or startup requested, not device readiness.
         public static bool TryApply(string json, TagTracker tracker, MarkerPlanePlacement placement, out string error)
         {
             error = null;
@@ -207,7 +210,7 @@ namespace PaceScape.RemoteControl
                     {
                         return true;
                     }
-                    error = "Ghost reference must be FixedPace or AllTimePersonalBest.";
+                    error = "Use FixedPace, AllTimePersonalBest, or SideBySide. SideBySide requires a reset and at most one marker.";
                     return false;
                 case "runner.configure":
                     if (tracker.TryConfigureRunner(payload.paceMinutesPerKilometre, payload.spawnLane,

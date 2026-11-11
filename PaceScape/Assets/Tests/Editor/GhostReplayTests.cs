@@ -1,3 +1,5 @@
+// Checks recorded speed playback, reference transitions, and fallback speeds.
+
 using System;
 using System.Collections;
 using System.Reflection;
@@ -5,7 +7,7 @@ using NUnit.Framework;
 
 namespace PaceScape.Tests
 {
-    /// <summary>Checks exact trace extraction and chained replay independently of Unity, BLE and frame rate.</summary>
+    // Checks exact trace extraction and chained replay independently of Unity, BLE and frame rate.
     public sealed class GhostReplayTests
     {
         private static Type RuntimeType(string name) => Type.GetType("PaceScape.Performance." + name + ", Assembly-CSharp", true);

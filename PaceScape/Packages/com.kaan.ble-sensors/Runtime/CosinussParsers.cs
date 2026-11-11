@@ -1,3 +1,5 @@
+// Decodes Cosinuss temperature, pulse oximetry, battery, and status packets.
+
 using System;
 
 // Pure C#: SIG standard payloads and the public cosinuss A002 packet formats.
@@ -65,6 +67,7 @@ public static class CosinussParsers
         if ((flags & 4) != 0) v.Type=(byte)r.U8();
         r.End(); return v;
     }
+    // Decodes pulse oximetry using the selected numeric format.
     public static PlxReading Plx(byte[] bytes,PlxEncoding encoding) {
         var r=new Reader(bytes); int flags=r.U8();
         if ((flags & 0xE0) != 0) throw new FormatException("Unbekannte SpO2-Flags");

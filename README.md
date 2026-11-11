@@ -1,18 +1,22 @@
 <div align="center">
 
-  <img src="docs/assets/pacescape-logo.png" alt="PaceScape" width="520">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pacescape-logo-dark.svg">
+    <img src="docs/assets/pacescape-logo-light.svg" alt="PaceScape – Läufer mit AR-Brille" width="440">
+  </picture>
 
   <h3>Lauftraining trifft Augmented Reality.</h3>
-  <p>Eine virtuelle Strecke. Ein Laufpartner. Deine reale Umgebung.</p>
+  <p>PaceScape · Die Unity-App für Lauftraining mit der Magic Leap 2.</p>
 
   <img src="https://img.shields.io/badge/Unity-2022.3-222222?style=flat-square" alt="Unity 2022.3">
-  <img src="https://img.shields.io/badge/Headset-Magic_Leap_2-00CDB5?style=flat-square" alt="Magic Leap 2">
-  <img src="https://img.shields.io/badge/XR-OpenXR-7952FF?style=flat-square" alt="OpenXR">
-  <img src="https://img.shields.io/badge/Status-Früher_Prototyp-7952FF?style=flat-square" alt="Status: Früher Prototyp">
+  <img src="https://img.shields.io/badge/Headset-Magic_Leap_2-55555f?style=flat-square" alt="Magic Leap 2">
+  <img src="https://img.shields.io/badge/XR-OpenXR-55555f?style=flat-square" alt="OpenXR">
+  <img src="https://img.shields.io/badge/Status-Fr%C3%BCher_Prototyp-55555f?style=flat-square" alt="Früher Prototyp">
 
   <br><br>
   <a href="#die-idee">Die Idee</a> &nbsp;·&nbsp;
   <a href="#entwicklungsstand">Entwicklungsstand</a> &nbsp;·&nbsp;
+  <a href="#schnellstart">Schnellstart</a> &nbsp;·&nbsp;
   <a href="#server--dashboard">Server &amp; Dashboard</a> &nbsp;·&nbsp;
   <a href="docs/tracking-setup.md">Dokumentation</a> &nbsp;·&nbsp;
   <a href="https://github.com/kaanguen/PaceScapeControll">Server-Repository</a>
@@ -42,13 +46,24 @@
 
 **[PaceScape Control](https://github.com/kaanguen/PaceScapeControll)** ist das separate Server-Projekt zur Steuerung der App. Das Dashboard läuft lokal am Rechner und verbindet sich über **WebSockets** mit PaceScape auf der Magic Leap 2.
 
-- **Ghost:** Genau zwei Tempoquellen: voreingestellte Geschwindigkeit oder Tempoverlauf eines gespeicherten Allzeit-PRs. Nach dessen Distanz wechselt der Ghost zu längeren vorhandenen PRs; ohne weiteren PR hält er sein letztes Tempo. Alte Rekorde ohne Verlauf nutzen ihre Durchschnittspace. Deine Laufbandmessung bestimmt deine Strecke, Runden und Bestzeiten unabhängig vom Ghost. [Einrichtung](docs/ghost-comparison.md).
-- **Laufbandansicht:** Optional den Ghost seitlich vor, neben oder hinter dem kalibrierten Laufbandplatz darstellen. Sein Tempo bleibt unabhängig; außerhalb der einstellbaren Sichtdistanz wird er ausgeblendet. Eine gekennzeichnete Vorschau ist unter **PaceScape → Ghost-Vorschau (Testdaten)** im Unity-Editor verfügbar.
+- **Ghost:** Voreingestellte Geschwindigkeit oder Tempoverlauf eines gespeicherten Allzeit-PRs. Nach dessen Distanz wechselt der Ghost zu längeren vorhandenen PRs; ohne weiteren PR hält er sein letztes Tempo. Alte Rekorde ohne Verlauf nutzen ihre Durchschnittspace. Deine Laufbandmessung bestimmt deine Strecke, Runden und Bestzeiten unabhängig vom Ghost. [Einrichtung](docs/ghost-comparison.md).
+- **Side by Side:** Der Begleiter bleibt neben dem kalibrierten Laufband und passt seine Laufanimation an die gemeldete Bandgeschwindigkeit an. Die Auswahl ist über das Unity-WebSocket-Protokoll verfügbar. [Einrichtung](docs/ghost-comparison.md#side-by-side)
+- **Laufbandansicht:** Die virtuelle Bahn zieht im gemessenen Bandtempo unter dem kalibrierten Laufbandplatz nach hinten. Ein Ghost mit eigenem Tempo erscheint je nach Abstand vor oder hinter dir. Die Bewegung lässt sich in der **Ghost-Vorschau (Testdaten)** im Unity-Editor ausprobieren.
 - **Pace:** Zieltempo live für bereits platzierte und neue Objekte einstellen.
 - **Läufer einstellen:** Pace, Spur 1–8 und Startabstand gemeinsam übernehmen. Wartende Läufer werden direkt an die eingestellte Startposition gesetzt.
 - **Lauf:** Der platzierte Läufer wartet auf „Lauf starten“. Pause hält seine Position; Weiterlaufen setzt den Lauf fort. Zurücksetzen beendet den Lauf und stellt die Startposition wieder her.
 - **Tracking:** Erkennung starten, stoppen oder neu platzieren sowie Marker- und Bodeneinstellungen anpassen.
 - **Status:** Trackingphase, platzierte und wartende Marker sowie App-Meldungen im Dark-Mode-Dashboard sehen.
+
+## Schnellstart
+
+### Unity-Projekt öffnen
+
+Öffne den Unterordner `PaceScape/` in Unity Hub mit **Unity 2022.3.62f3**. Die Tracking-Szene liegt unter `Assets/Scenes/MarkerTrackingScene.unity`.
+
+Für einen visuellen Test mit simuliertem Laufbandtempo öffne außerhalb des Play Mode **PaceScape → Ghost-Vorschau (Testdaten)**. Dort kannst du den PR-Ghost und **Side by Side** ausprobieren.
+
+### Dashboard starten
 
 Im Server-Repository mit **Node.js 22 oder neuer** starten:
 

@@ -1,8 +1,10 @@
+// Uses humanoid IK to support the runner's feet on the anchored track plane.
+
 using UnityEngine;
 
 namespace PaceScape.RunningTrack
 {
-    /// <summary>Supports low feet on the anchored track plane while preserving the running flight phase.</summary>
+    // Supports low feet on the anchored track plane while preserving the running flight phase.
     [RequireComponent(typeof(Animator))]
     [DisallowMultipleComponent]
     public sealed class RunnerFootPlacement : MonoBehaviour
@@ -16,7 +18,7 @@ namespace PaceScape.RunningTrack
         private float _leftToeSoleHeight;
         private float _rightToeSoleHeight;
 
-        /// <summary>Uses the same fixed floor plane as the anchored running track, without physics queries.</summary>
+        // Uses the same fixed floor plane as the anchored running track, without physics queries.
         public void Configure(Transform groundReference)
         {
             _groundReference = groundReference;
@@ -35,6 +37,7 @@ namespace PaceScape.RunningTrack
             _animator = GetComponent<Animator>();
         }
 
+        // Applies foot support during the Animator's IK pass.
         private void OnAnimatorIK(int layerIndex)
         {
             if (_groundReference == null || _animator == null || !_animator.isHuman)
@@ -58,6 +61,7 @@ namespace PaceScape.RunningTrack
                 soleHeight * transform.lossyScale.y);
         }
 
+        // Uses ankle and toe heights to weight support near the floor.
         private void PlaceFoot(AvatarIKGoal goal, float soleHeight, Transform toes, float toeSoleHeight)
         {
             Vector3 up = _groundReference.up;

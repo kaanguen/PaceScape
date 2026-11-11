@@ -1,3 +1,5 @@
+// Edits the project's WebSocket endpoint and reconnects the client in Play Mode.
+
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -10,7 +12,7 @@ using UnityEngine.UIElements;
 
 namespace PaceScape.Editor
 {
-    /// <summary>Edits the build defaults and reconnects the current Editor client on demand.</summary>
+    // Edits the build defaults and reconnects the current Editor client on demand.
     public sealed class RemoteControlSettingsWindow : EditorWindow
     {
         private const string AssetPath = "Assets/Resources/PaceScapeConnection.asset";
@@ -49,7 +51,7 @@ namespace PaceScape.Editor
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
         }
 
-        /// <summary>Builds a native Editor settings form using UI Toolkit.</summary>
+        // Builds a native Editor settings form using UI Toolkit.
         public void CreateGUI()
         {
             VisualElement root = rootVisualElement;
@@ -133,6 +135,7 @@ namespace PaceScape.Editor
             parent.Add(label);
         }
 
+        // Offers active local IPv4 addresses and preserves the configured port.
         private void UseLocalComputerAddress()
         {
             _localAddresses.Clear();
@@ -234,6 +237,7 @@ namespace PaceScape.Editor
             ShowStatus("Lokale Rechner-IP übernommen; Port und /ws bleiben erhalten. Bei mehreren Adaptern das Netz der Brille auswählen. Danach speichern. Der Server muss auf diesem Rechner im LAN-Modus laufen; die Erreichbarkeit wurde nicht geprüft.", HelpBoxMessageType.Info);
         }
 
+        // Validates the form before saving defaults to a Resources asset.
         private bool SaveSettings()
         {
             if (!RemoteControlSettings.TryParseServerUrl(_serverUrl.value, out Uri uri))
@@ -283,6 +287,7 @@ namespace PaceScape.Editor
             }
         }
 
+        // Saves the form and reloads the active client's connection settings.
         private void ReconnectInPlayMode()
         {
             if (!EditorApplication.isPlaying)

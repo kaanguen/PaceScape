@@ -1,3 +1,5 @@
+// Renders unlit track markings for both eyes in URP.
+
 Shader "PaceScape/TrackMarkings"
 {
 

@@ -1,9 +1,11 @@
+// Replays stored personal-best speeds and continues with longer records when available.
+
 using System;
 using System.Collections.Generic;
 
 namespace PaceScape.Performance
 {
-    /// <summary>Replays measured PR sections, chaining the next longer record at the same absolute distance.</summary>
+    // Replays measured PR sections, chaining the next longer record at the same absolute distance.
     public sealed class GhostReplay
     {
         private readonly List<PersonalBestRecord> _records = new List<PersonalBestRecord>();
@@ -13,22 +15,22 @@ namespace PaceScape.Performance
         private double _fallbackSpeed;
         private bool _holding;
 
-        /// <summary>Gets total ghost progress, independent of lane circumference and user measurements.</summary>
+        // Gets total ghost progress, independent of lane circumference and user measurements.
         public double DistanceMetres { get; private set; }
-        /// <summary>Gets the current instantaneous reference speed, including measured standstill.</summary>
+        // Gets the current instantaneous reference speed, including measured standstill.
         public double SpeedMetresPerSecond { get; private set; }
-        /// <summary>Gets the current reference distance, which may exceed the initially selected distance.</summary>
+        // Gets the current reference distance, which may exceed the initially selected distance.
         public int ReferenceDistanceMetres { get; private set; }
-        /// <summary>Gets whether the current reference is a measured speed trace.</summary>
+        // Gets whether the current reference is a measured speed trace.
         public bool HasTrace => !_holding && _record != null && _record.trace != null && _record.trace.Count >= 2;
-        /// <summary>Gets whether the final speed is retained because no longer measured record exists.</summary>
+        // Gets whether the final speed is retained because no longer measured record exists.
         public bool IsHoldingSpeed => _holding;
-        /// <summary>Gets the timestamp of the active measured record, or null for preset/example fallback.</summary>
+        // Gets the timestamp of the active measured record, or null for preset/example fallback.
         public string AchievedUtc => _record?.achievedUtc;
-        /// <summary>Gets whether a genuine measured record supplies the active reference.</summary>
+        // Gets whether a genuine measured record supplies the active reference.
         public bool HasMeasuredReference => _record != null;
 
-        /// <summary>Snapshots references so new user records cannot change an opponent midway through playback.</summary>
+        // Snapshots references so new user records cannot change an opponent midway through playback.
         public void Reset(PersonalBestBook book, int initialDistance, double fallbackSpeed, double startDistance = 0)
         {
             if (book == null || !book.IsValid() || initialDistance < 1 || initialDistance > 1000000 ||
@@ -78,7 +80,7 @@ namespace PaceScape.Performance
             SeekReference(DistanceMetres);
         }
 
-        /// <summary>Integrates all crossed speed boundaries exactly and returns this step's physical travel.</summary>
+        // Integrates all crossed speed boundaries exactly and returns this step's physical travel.
         public double Advance(double seconds)
         {
             if (!IsFinite(seconds) || seconds <= 0)
@@ -134,6 +136,7 @@ namespace PaceScape.Performance
             return DistanceMetres - before;
         }
 
+        // Selects the shortest available record longer than the active reference.
         private PersonalBestRecord FindNext()
         {
             foreach (PersonalBestRecord record in _records)
@@ -146,6 +149,7 @@ namespace PaceScape.Performance
             return null;
         }
 
+        // Locates the trace segment at the current absolute distance.
         private void SeekReference(double distance)
         {
             _segment = 0;
@@ -177,6 +181,7 @@ namespace PaceScape.Performance
                 Math.Max(0, distance - start.distanceMetres) / SpeedMetresPerSecond : 0);
         }
 
+        // Derives the current speed from the active trace segment.
         private void SetSegmentSpeed()
         {
             EffortPoint start = _record.trace[_segment];

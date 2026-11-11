@@ -1,3 +1,5 @@
+// Captures mixed-reality camera frames and publishes JPEG previews to the dashboard client.
+
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,6 +27,7 @@ namespace PaceScape.RemoteControl
 
         private static bool IsSupported => !Application.isEditor && Application.platform == RuntimePlatform.Android;
 
+        // Starts camera capture after validating the current preview state.
         public bool TryStart(Action<byte[]> publish, out string error)
         {
             error = null;
@@ -41,6 +44,7 @@ namespace PaceScape.RemoteControl
             return true;
         }
 
+        // Cancels the active preview session so capture resources can be released.
         public void Stop()
         {
             _cancellation?.Cancel();
@@ -50,6 +54,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
+        // Reports camera preview status to the dashboard.
         public RemoteCameraState CaptureState()
         {
             return new RemoteCameraState
@@ -61,6 +66,7 @@ namespace PaceScape.RemoteControl
             };
         }
 
+        // Owns camera setup, frame processing, and teardown for one preview session.
         private async Task CaptureAsync(Action<byte[]> publish, CancellationTokenSource cancellation)
         {
             CancellationToken token = cancellation.Token;
@@ -228,6 +234,7 @@ namespace PaceScape.RemoteControl
             }
         }
 
+        // Copies camera rows into a tightly packed buffer for JPEG encoding.
         private static void CopyRgbaFrame(MLCamera.CameraOutput output, byte[] rgba)
         {
             if (output.Format != MLCamera.OutputFormat.RGBA_8888 || output.Planes?.Length != 1)

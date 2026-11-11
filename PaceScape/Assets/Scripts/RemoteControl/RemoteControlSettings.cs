@@ -1,15 +1,17 @@
+// Stores and validates the project's default dashboard connection settings.
+
 using System;
 using UnityEngine;
 
 namespace PaceScape.RemoteControl
 {
-    /// <summary>Project defaults for the control connection, included in builds through Resources.</summary>
+    // Project defaults for the control connection, included in builds through Resources.
     public sealed class RemoteControlSettings : ScriptableObject
     {
-        /// <summary>Gets the Resources lookup name used by the runtime client.</summary>
+        // Gets the Resources lookup name used by the runtime client.
         public const string ResourceName = "PaceScapeConnection";
 
-        /// <summary>Gets the loopback endpoint used with USB forwarding.</summary>
+        // Gets the loopback endpoint used with USB forwarding.
         public const string DefaultServerUrl = "ws://127.0.0.1:8787/ws";
 
         [SerializeField] private bool _connectionEnabled = true;
@@ -17,23 +19,23 @@ namespace PaceScape.RemoteControl
         [SerializeField] private string _accessToken = string.Empty;
         [SerializeField] private bool _allowLanMotorControl;
 
-        /// <summary>Gets whether the client should connect.</summary>
+        // Gets whether the client should connect.
         public bool ConnectionEnabled => _connectionEnabled;
 
-        /// <summary>Gets the complete WebSocket server endpoint.</summary>
+        // Gets the complete WebSocket server endpoint.
         public string ServerUrl => _serverUrl;
 
-        /// <summary>Gets the optional shared token for a trusted local network.</summary>
+        // Gets the optional shared token for a trusted local network.
         public string AccessToken => _accessToken;
 
-        /// <summary>Gets or sets whether the configured IP endpoint may issue motor commands over LAN.</summary>
+        // Gets or sets whether the configured IP endpoint may issue motor commands over LAN.
         public bool AllowLanMotorControl
         {
             get => _allowLanMotorControl;
             set => _allowLanMotorControl = value;
         }
 
-        /// <summary>Validates all connection values before updating the project defaults.</summary>
+        // Validates all connection values before updating the project defaults.
         public bool TryConfigure(bool connectionEnabled, string serverUrl, string accessToken)
         {
             if (!TryParseServerUrl(serverUrl, out Uri uri))
@@ -47,7 +49,7 @@ namespace PaceScape.RemoteControl
             return true;
         }
 
-        /// <summary>Requires the relay's /ws endpoint without embedded credentials, query or fragment.</summary>
+        // Requires the relay's /ws endpoint without embedded credentials, query or fragment.
         public static bool TryParseServerUrl(string serverUrl, out Uri uri)
         {
             if (!Uri.TryCreate(serverUrl?.Trim(), UriKind.Absolute, out uri))

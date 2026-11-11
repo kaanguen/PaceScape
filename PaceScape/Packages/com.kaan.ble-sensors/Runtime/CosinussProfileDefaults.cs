@@ -1,3 +1,5 @@
+// Builds the default BLE profile for Cosinuss sensor measurements.
+
 using UnityEngine;
 
 // Preset data only. The BLE transport has no knowledge of these UUIDs or names.

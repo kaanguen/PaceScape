@@ -1,3 +1,5 @@
+// Coordinates belt measurements, local record storage, and the ghost's pace reference.
+
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -9,7 +11,7 @@ using UnityEngine;
 
 namespace PaceScape.Performance
 {
-    /// <summary>Owns belt-only measurements and local records independently of avatar displacement.</summary>
+    // Owns belt-only measurements and local records independently of avatar displacement.
     [DisallowMultipleComponent]
     public sealed class RunnerPerformance : MonoBehaviour
     {
@@ -39,22 +41,37 @@ namespace PaceScape.Performance
         private string _storageError;
         private string _measurementStatus = "Waiting";
 
-        /// <summary>Gets whether real belt speed is currently fresh; this never selects ghost speed.</summary>
-        public bool HasFreshInput => _input != null && _input.TryGetSpeedKmh(out _);
+        // Gets whether real belt speed is currently fresh, including a stopped belt.
+        public bool HasFreshInput => TryGetBeltSpeedMetresPerSecond(out _);
 
-        /// <summary>Gets the same signed comparison used by telemetry, once continuity is established.</summary>
+        // Converts the fresh FTMS sample from kilometres per hour to metres per second.
+        public bool TryGetBeltSpeedMetresPerSecond(out double speed)
+        {
+            speed = 0;
+            if (_input == null || !_input.TryGetSpeedKmh(out double speedKmh))
+            {
+                return false;
+            }
+
+            speed = speedKmh / 3.6;
+            return true;
+        }
+
+        // Gets the same signed comparison used by telemetry, once continuity is established.
         public bool TryGetGhostGap(out double ghostGapMetres)
         {
             ghostGapMetres = _ghostDistance - _comparisonGhostOrigin - _laps.TotalDistanceMetres;
             return _wasMeasuring && !_hasMeasurementGap;
         }
 
-        /// <summary>Gets the selected fixed lap and rolling best-effort distance.</summary>
+        // Gets the selected fixed lap and rolling best-effort distance.
         public int ComparisonDistanceMetres => (int)_laps.DistanceMetres;
-        /// <summary>Gets whether clearly marked demonstration records may supply fallback ghost pace.</summary>
+        // Drives the treadmill track from the same distance used for measurement.
+        internal double MeasuredDistanceMetres => _laps.TotalDistanceMetres;
+        // Gets whether clearly marked demonstration records may supply fallback ghost pace.
         public bool UseDemoRecords => _useDemoRecords;
 
-        /// <summary>Binds scene sources once; no scene searches occur during measurement.</summary>
+        // Binds scene sources once; no scene searches occur during measurement.
         public void Bind(TagTracker tracker, TreadmillInput input, ServerTestScene preview)
         {
             _tracker = tracker;
@@ -73,7 +90,7 @@ namespace PaceScape.Performance
         private RunningSession.RunState State => _tracker != null ? _tracker.RunState :
             _preview != null ? _preview.RunState : RunningSession.RunState.Ready;
 
-        /// <summary>Applies comparison settings; distance changes require a reset run.</summary>
+        // Applies comparison settings; distance changes require a reset run.
         public bool TryConfigure(float distanceMetres, bool useDemoRecords)
         {
             if (float.IsNaN(distanceMetres) || float.IsInfinity(distanceMetres) || distanceMetres < 1 ||
@@ -98,7 +115,7 @@ namespace PaceScape.Performance
             return true;
         }
 
-        /// <summary>Clears this session's statistics while retaining real all-time records and settings.</summary>
+        // Clears this session's statistics while retaining real all-time records and settings.
         public void ResetSession()
         {
             _laps.TryReset(ComparisonDistanceMetres);
@@ -111,13 +128,13 @@ namespace PaceScape.Performance
             _hasMeasurementGap = false;
         }
 
-        /// <summary>Invalidates the reference on mode changes without rewinding physical ghost progress.</summary>
+        // Invalidates the reference on mode changes without rewinding physical ghost progress.
         public void RunnerModeChanged()
         {
             _hasReplay = false;
         }
 
-        /// <summary>Advances one shared replay step after the scene has verified tracking and run state.</summary>
+        // Advances one shared replay step after the scene has verified tracking and run state.
         public double AdvanceGhost(float deltaTime, double currentDistance, float fallbackPace)
         {
             if (!_hasReplay)
@@ -131,18 +148,24 @@ namespace PaceScape.Performance
             return travel;
         }
 
-        /// <summary>Gets the replay's current speed, including genuine stationary intervals.</summary>
+        // Gets the replay's current speed, including genuine stationary intervals.
         public double GhostSpeedMetresPerSecond => _hasReplay ? _replay.SpeedMetresPerSecond : 0;
 
-        /// <summary>Tracks fixed-mode physical travel for progress comparison, never for user measurements.</summary>
+        // Tracks fixed-mode physical travel for progress comparison, never for user measurements.
         public void ObserveGhostDistance(double distance)
         {
             _ghostDistance = distance;
         }
 
-        /// <summary>Resolves instantaneous replay pace, or the existing measured/example/preset fallback.</summary>
+        // Resolves instantaneous replay pace, or the existing measured/example/preset fallback.
         public float GetTargetPace(RunningSession.RunnerMode mode, float fallback)
         {
+            if (mode == RunningSession.RunnerMode.SideBySide)
+            {
+                return TryGetBeltSpeedMetresPerSecond(out double speed) && speed > 0
+                    ? (float)(1000 / (speed * 60))
+                    : 0;
+            }
             if (mode == RunningSession.RunnerMode.AllTimePersonalBest && _hasReplay)
             {
                 return _replay.SpeedMetresPerSecond > 0 ? (float)(1000 / (_replay.SpeedMetresPerSecond * 60)) : 0;
@@ -172,6 +195,7 @@ namespace PaceScape.Performance
             }
         }
 
+        // Collects belt measurements after the scene has updated ghost progress.
         private void LateUpdate()
         {
             double now = Time.realtimeSinceStartupAsDouble;
@@ -237,6 +261,7 @@ namespace PaceScape.Performance
             _pendingJson = JsonUtility.ToJson(_book);
         }
 
+        // Loads a validated primary record book or recovers from its backup.
         private void Load()
         {
             if (_isLoaded)
@@ -279,6 +304,7 @@ namespace PaceScape.Performance
             return loaded;
         }
 
+        // Coalesces pending snapshots and retries failed writes after a delay.
         private void PollSave(bool force = false)
         {
             if (_save != null)
@@ -316,6 +342,7 @@ namespace PaceScape.Performance
             _save = Task.Run(() => Save(path, json, preservePrimary));
         }
 
+        // Writes a temporary snapshot before replacing the primary record file.
         private static void Save(string path, string json, bool preservePrimary)
         {
             string temporary = path + ".tmp";
@@ -331,6 +358,7 @@ namespace PaceScape.Performance
             }
         }
 
+        // Packages measurement, replay, and save status for the dashboard.
         internal PerformanceState CaptureState()
         {
             double real = _book.Find(ComparisonDistanceMetres);
@@ -342,7 +370,7 @@ namespace PaceScape.Performance
                     _replay.HasTrace ? "RecordedTrace" : _replay.HasMeasuredReference ? "RecordAverage" : "Fallback",
                 ghostReferenceAchievedUtc = _hasReplay ? _replay.AchievedUtc : null,
                 ghostDistanceMetres = _ghostDistance,
-                hasProgressComparison = _wasMeasuring && !_hasMeasurementGap,
+                hasProgressComparison = (_tracker == null || !_tracker.IsSideBySide) && _wasMeasuring && !_hasMeasurementGap,
                 userLeadMetres = _laps.TotalDistanceMetres - (_ghostDistance - _comparisonGhostOrigin) +
                     (_tracker != null ? _tracker.RelativeStartOffset : 0),
                 comparisonDistanceMetres = ComparisonDistanceMetres,

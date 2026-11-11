@@ -1,9 +1,11 @@
+// Accumulates belt distance and measures consecutive fixed-distance laps.
+
 using System;
 using System.Collections.Generic;
 
 namespace PaceScape.Performance
 {
-    /// <summary>Measures complete fixed-distance efforts from belt samples, independently of avatar motion.</summary>
+    // Measures complete fixed-distance efforts from belt samples, independently of avatar motion.
     public sealed class DistancePerformance
     {
         private readonly List<LapResult> _history = new List<LapResult>();
@@ -11,28 +13,28 @@ namespace PaceScape.Performance
         private double _lapDistance;
         private bool _isLapValid = true;
 
-        /// <summary>Gets the selected measurement distance in metres.</summary>
+        // Gets the selected measurement distance in metres.
         public double DistanceMetres { get; private set; } = 400;
-        /// <summary>Gets total measured distance in this session.</summary>
+        // Gets total measured distance in this session.
         public double TotalDistanceMetres { get; private set; }
-        /// <summary>Gets elapsed measured session time, including stopped belts.</summary>
+        // Gets elapsed measured session time, including stopped belts.
         public double ElapsedSeconds { get; private set; }
-        /// <summary>Gets the number of completed distance blocks, including invalid blocks.</summary>
+        // Gets the number of completed distance blocks, including invalid blocks.
         public int CompletedLaps { get; private set; }
-        /// <summary>Gets progress within the current distance block.</summary>
+        // Gets progress within the current distance block.
         public double LapDistanceMetres => _lapDistance;
-        /// <summary>Gets elapsed time within the current distance block.</summary>
+        // Gets elapsed time within the current distance block.
         public double LapSeconds => ElapsedSeconds - _lapStartedAt;
-        /// <summary>Gets whether the current block contains no measurement gaps.</summary>
+        // Gets whether the current block contains no measurement gaps.
         public bool IsLapValid => _isLapValid;
-        /// <summary>Gets the last valid completed effort time, or zero before a result.</summary>
+        // Gets the last valid completed effort time, or zero before a result.
         public double LastLapSeconds { get; private set; }
-        /// <summary>Gets the fastest valid completed effort this session, or zero before a result.</summary>
+        // Gets the fastest valid completed effort this session, or zero before a result.
         public double BestSeconds { get; private set; }
-        /// <summary>Raised only for a fully measured distance block, including slower efforts.</summary>
+        // Raised only for a fully measured distance block, including slower efforts.
         public event Action<double, double> EffortCompleted;
 
-        /// <summary>Resets session measurements while selecting a new distance.</summary>
+        // Resets session measurements while selecting a new distance.
         public bool TryReset(double distanceMetres)
         {
             // This is an engineering input bound, not a prescribed training distance.
@@ -53,7 +55,7 @@ namespace PaceScape.Performance
             return true;
         }
 
-        /// <summary>Marks an unknown interval; a partially measured block cannot become a record.</summary>
+        // Marks an unknown interval; a partially measured block cannot become a record.
         public void Interrupt()
         {
             if (_lapDistance > 0 || LapSeconds > 0)
@@ -62,7 +64,7 @@ namespace PaceScape.Performance
             }
         }
 
-        /// <summary>Integrates one known constant-speed interval, interpolating exact distance boundaries.</summary>
+        // Integrates one known constant-speed interval, interpolating exact distance boundaries.
         public void Advance(double seconds, double speedKmh)
         {
             if (!IsFinite(seconds) || seconds <= 0 || !IsFinite(speedKmh) || speedKmh < 0)
@@ -112,7 +114,7 @@ namespace PaceScape.Performance
             }
         }
 
-        /// <summary>Copies up to the latest 100 completed lap results for display.</summary>
+        // Copies up to the latest 100 completed lap results for display.
         public LapResult[] CopyHistory()
         {
             return _history.ToArray();
@@ -124,7 +126,7 @@ namespace PaceScape.Performance
         }
     }
 
-    /// <summary>A completed distance block; invalid entries are display-only and never records.</summary>
+    // A completed distance block; invalid entries are display-only and never records.
     [Serializable]
     public sealed class LapResult
     {
