@@ -29,6 +29,7 @@ namespace PaceScape.RemoteControl
     internal sealed class RemotePayload
     {
         // Sentinels ensure omitted numeric members fail validation instead of silently becoming zero.
+        public RunnerWarmup.Step[] steps;
         public string deviceId;
         public int targetSpeedUnits;
         public string runnerMode;
@@ -69,6 +70,8 @@ namespace PaceScape.RemoteControl
         public string startupError;
         public int placedMarkers;
         public int pendingMarkers;
+        public int warmupControlVersion;
+        public RunnerWarmup.State warmup;
         public int runnerControlVersion;
         public int runnerModeControlVersion;
         public int ghostControlVersion;
@@ -182,6 +185,32 @@ namespace PaceScape.RemoteControl
             RemotePayload payload = message.payload;
             switch (message.commandType)
             {
+                case "exercise.startWarmup":
+                    if (tracker.TryStartWarmup(payload.steps))
+                    {
+                        return true;
+                    }
+                    error = "Warm-up requires a tracked headset in Ready, a visible coach and 1–20 supported exercises of 1–300 seconds.";
+                    return false;
+                case "exercise.nextWarmup":
+                    if (tracker.CaptureWarmup(false).countdownRemaining > 0f)
+                    {
+                        error = "Wait for the warm-up countdown to finish before skipping an exercise.";
+                        return false;
+                    }
+                    if (tracker.TryNextWarmupExercise())
+                    {
+                        return true;
+                    }
+                    error = "No active warm-up.";
+                    return false;
+                case "exercise.stopWarmup":
+                    if (tracker.StopWarmup())
+                    {
+                        return true;
+                    }
+                    error = "No active warm-up.";
+                    return false;
                 case "runner.presentation":
                     if (tracker.TryConfigureGhostPresentation(payload.presentationMode, payload.sideOffsetMetres,
                         payload.visibilityDistanceMetres))

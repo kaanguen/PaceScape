@@ -29,3 +29,7 @@ This notice applies only to the Unity Starter Assets listed above. It does not a
 - The user's `com.kaan.ble-sensors` package is copied from MarkerML2 under `PaceScape/Packages/com.kaan.ble-sensors/`, preserving its native companion JAR and metadata. Its source/build limitations are documented in the package README and [treadmill setup](docs/treadmill.md).
 - [Velorexe Unity Android Bluetooth Low Energy](https://github.com/Velorexe/Unity-Android-Bluetooth-Low-Energy), revision `55d8c12e155cc45bc26cea120d5e8c1e5f231b9f`, is resolved through Unity Package Manager and retains its accompanying license.
 - [Decathlon Domyos developer examples](https://github.com/Decathlon/domyos-developers), CC BY 4.0, were consulted for FTMS UUIDs and wire-format information. No example source code or brand assets were copied; this integration uses the user's existing decoder. No affiliation or compatibility with an untested individual model is claimed.
+
+## Mixamo warm-up clips
+
+`PaceScape/Assets/Characters/Jogger/Warmup/` contains the prepared looping humanoid clips `Mixamo_StartJumpingJacks` and `Mixamo_AirSquat` from MarkerML2. They derive from user-supplied Adobe Mixamo downloads. Adobe describes permitted project uses in the [Mixamo FAQ](https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html).

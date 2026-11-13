@@ -43,6 +43,7 @@ namespace PaceScape.Tracking
 
         [SerializeField] private XROrigin _xrOrigin;
         [SerializeField] private GameObject _markerPrefab;
+        [SerializeField] private GameObject _warmupCoachPrefab;
         [SerializeField, Min(0f)]
         [Tooltip("Object distance behind the start line in meters, opposite to the running direction. Can be changed for existing objects while waiting for a run.")]
         private float _distanceBehindStartLine = 0.5f;
@@ -172,9 +173,58 @@ namespace PaceScape.Tracking
         }
 
         // Reports whether the foreground tracking session can start or resume all placed objects.
-        public bool CanRun => isActiveAndEnabled && IsForeground && _hasHeadTracking &&
+        public bool CanRun => !_warmup.Active && isActiveAndEnabled && IsForeground && _hasHeadTracking &&
             _startupPhase == StartupPhase.Ready && _markers.Count > 0 && RunnableMarkerCount == _markers.Count &&
             (!UsesTreadmillPlacement || (HasGhostCalibration && PerformanceSource != null && PerformanceSource.HasFreshInput));
+
+        private bool CanStartWarmup => !_warmup.Active && RunState == RunningSession.RunState.Ready &&
+            isActiveAndEnabled && IsForeground && _hasHeadTracking && Phase == StartupPhase.Ready &&
+            _warmupCoachPrefab != null && _xrOrigin != null && _xrOrigin.Camera != null &&
+            _xrOrigin.Camera.isActiveAndEnabled;
+
+        /// <summary>Starts an exercise sequence on a separate camera-relative avatar.</summary>
+        public bool TryStartWarmup(RunnerWarmup.Step[] steps)
+        {
+            if (!CanStartWarmup || !RunnerWarmup.IsValidPlan(steps) ||
+                !WarmupCoachView.TryCreate(_warmupCoachPrefab, _xrOrigin.Camera, out _warmupCoach))
+            {
+                return false;
+            }
+            if (_warmup.TryStart(_warmupCoach.Animator, steps))
+            {
+                _warmupCoach.ShowCountdown(_warmup.CountdownDisplay);
+                return true;
+            }
+
+            StopWarmup();
+            return false;
+        }
+
+        /// <summary>Skips the current exercise or removes the coach after the last step.</summary>
+        public bool TryNextWarmupExercise()
+        {
+            bool skipped = _warmup.TryNext();
+            if (!_warmup.Active)
+            {
+                StopWarmup();
+            }
+            return skipped;
+        }
+
+        /// <summary>Ends the warm-up and removes the camera-relative avatar.</summary>
+        public bool StopWarmup(string status = "Stopped")
+        {
+            bool stopped = _warmup.Stop(status);
+            _warmupCoach?.Dispose();
+            _warmupCoach = null;
+            return stopped;
+        }
+
+        /// <summary>Captures warm-up eligibility and playback for remote controls.</summary>
+        public RunnerWarmup.State CaptureWarmup(bool beltStarting)
+        {
+            return _warmup.CaptureState(!beltStarting && CanStartWarmup);
+        }
 
         // Gets the initial longitudinal separation used only by the relative distance display.
         public float RelativeStartOffset => !IsSideBySide && _ghostPresentation.Enabled ? _distanceBehindStartLine : 0;
@@ -377,6 +427,7 @@ namespace PaceScape.Tracking
         // Stops movement and returns existing objects to their configured start positions.
         public void ResetRun()
         {
+            StopWarmup();
             _runSession.Reset();
             PerformanceSource?.ResetSession();
             foreach (MarkerVisual marker in _markers.Values)
@@ -402,6 +453,8 @@ namespace PaceScape.Tracking
             return true;
         }
 
+        private readonly RunnerWarmup _warmup = new RunnerWarmup();
+        private WarmupCoachView _warmupCoach;
         private readonly RunningSession _runSession = new RunningSession();
         private bool _hasHeadTracking;
         private readonly Dictionary<ulong, MarkerVisual> _markers = new Dictionary<ulong, MarkerVisual>();
@@ -1050,8 +1103,33 @@ namespace PaceScape.Tracking
                 }
             }
 
+            UpdateWarmup(Time.unscaledDeltaTime);
             ApplyGhostPresentation();
             return true;
+        }
+
+        private void UpdateWarmup(float deltaTime)
+        {
+            if (!_warmup.Active)
+            {
+                return;
+            }
+
+            if (_xrOrigin == null || !_warmupCoach.IsAvailable(_xrOrigin.Camera) || !_warmupCoach.UpdateLayout())
+            {
+                StopWarmup("ViewUnavailable");
+                return;
+            }
+
+            _warmup.Tick(deltaTime);
+            if (!_warmup.Active)
+            {
+                StopWarmup();
+            }
+            else
+            {
+                _warmupCoach.ShowCountdown(_warmup.CountdownDisplay);
+            }
         }
 
         // Retains a marker pose while asynchronous plane detection catches up.
@@ -1129,6 +1207,7 @@ namespace PaceScape.Tracking
 
         private void HideVisuals()
         {
+            StopWarmup("TrackingLost");
             _hasHeadTracking = false;
             _runSession.TryPause();
             foreach (MarkerVisual marker in _markers.Values)
@@ -1384,6 +1463,7 @@ namespace PaceScape.Tracking
         // Tears down the detector, scanning, anchors, and owned content.
         private void ReleaseResources()
         {
+            StopWarmup("TrackingLost");
             _runSession.Reset();
             PerformanceSource?.ResetSession();
             _hasHeadTracking = false;

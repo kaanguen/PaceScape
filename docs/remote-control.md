@@ -122,3 +122,34 @@ The .NET transport, native readiness and these physical lifecycle effects still 
 The dashboard runner panel converts slider speed in km/h to pace and sends edits automatically after a 500 ms input pause using `runner.pace`. Only pace changes; draft lane/offset values are not submitted. A pending command is allowed to finish before the newest pace edit is sent. The confirmed target is displayed separately. Disconnects clear queued updates, and rejected/timed-out commands are not replayed.
 
 The avatar now begins mixing jogging at 85% of imported walking speed and reaches the original run clip at its native speed. Playback rate compensates for blended native velocity, preserving physical lane speed. This is a visual gait preference, not a training prescription or exact foot-contact guarantee. Unity compilation, gait tests and target-device naturalness checks remain pending.
+
+## Warm-up
+
+Der Tracking-Client meldet `warmupControlVersion: 1`. In `Ready` mit getracktem Headset kann das Warm-up auch ohne platzierte Laufbahn starten. Eine kleine Instanz des PaceScape-Joggers zeigt die Übungen unten rechts im Sichtfeld und folgt der Kopfbewegung. Sie verschwindet nach Ende oder Abbruch. Während des Warm-ups bleibt der Laufstart gesperrt. Verlust des Kopftrackings oder der Serververbindung sowie eine nicht mehr verfügbare Kameradarstellung beenden die Sequenz. Ein Start mit ungültigem Plan oder unsichtbarem Avatar wird abgelehnt. Das Warm-up steuert das Laufband nicht.
+
+`exercise.startWarmup` nimmt 1–20 Übungen in der gewünschten Reihenfolge an. Jeder Schritt braucht eine Dauer von 1–300 Sekunden und eine der folgenden Animations-IDs.
+
+| Animations-ID | Übung |
+| --- | --- |
+| `Mixamo_StartJumpingJacks` | Hampelmänner |
+| `Mixamo_AirSquat` | Kniebeugen |
+
+Die folgenden Zeitwerte dienen als Beispiel für das Protokoll.
+
+```json
+{
+  "type": "command",
+  "commandId": "warmup-1",
+  "commandType": "exercise.startWarmup",
+  "payload": {
+    "steps": [
+      { "animationId": "Mixamo_StartJumpingJacks", "seconds": 8 },
+      { "animationId": "Mixamo_AirSquat", "seconds": 8 }
+    ]
+  }
+}
+```
+
+`exercise.nextWarmup` überspringt die aktuelle Übung und `exercise.stopWarmup` beendet die Sequenz. Beide Befehle verwenden `"payload": {}`. In `state.warmup` stehen `active`, `canStart`, `status`, der nullbasierte `stepIndex`, `stepCount`, `animationId`, `stepElapsed` und `stepDuration`. Außerhalb einer aktiven Sequenz ist `stepIndex` gleich −1. Bei Abbruch meldet `status` je nach Ursache `TrackingLost`, `ConnectionLost` oder `ViewUnavailable`.
+
+In Unity zeigt **PaceScape → Warm-up-Vorschau** beide Übungen aus der Kameraperspektive ohne WebSocket-Verbindung. Mit **Kopfdrehung** lässt sich die feste Position im Sichtfeld prüfen. Im aktualisierten PaceScape-Control-Dashboard findest du **Warm-up** als eigenen Reiter in der Hauptnavigation. Dort kannst du eine Übungsfolge zusammenstellen, starten, überspringen und beenden. Mit `npm run simulate` lässt sich der Ablauf auch ohne Brille ausprobieren. Die Marker-freie Server-Testszene meldet keine Warm-up-Unterstützung.
