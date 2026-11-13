@@ -66,8 +66,6 @@ namespace PaceScape.Performance
 
         // Gets the selected fixed lap and rolling best-effort distance.
         public int ComparisonDistanceMetres => (int)_laps.DistanceMetres;
-        // Drives the treadmill track from the same distance used for measurement.
-        internal double MeasuredDistanceMetres => _laps.TotalDistanceMetres;
         // Gets whether clearly marked demonstration records may supply fallback ghost pace.
         public bool UseDemoRecords => _useDemoRecords;
 
@@ -204,7 +202,7 @@ namespace PaceScape.Performance
             double speed = 0;
             bool hasSpeed = _input != null && _input.TryGetSpeedKmh(out speed);
             bool canMeasure = State == RunningSession.RunState.Running && hasSpeed &&
-                _tracker != null && _tracker.CanRun;
+                _tracker != null && !_tracker.IsManual && _tracker.CanRun;
             if (canMeasure && _wasMeasuring && delta > 0 && delta <= 2)
             {
                 // Hold the previous known sample across its interval; never use avatar smoothing as data.

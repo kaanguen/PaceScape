@@ -45,9 +45,15 @@ namespace PaceScape.RunningTrack
         // Keeps the current point and tangent of the lane at the calibrated treadmill position.
         public static Pose EvaluateTrackPose(int lane, Vector3 origin, double travelledMetres, out double laneMetres)
         {
+            return EvaluateDirectedTrackPose(lane, origin, travelledMetres, false, out laneMetres);
+        }
+
+        internal static Pose EvaluateDirectedTrackPose(int lane, Vector3 origin, double travelledMetres,
+            bool reverse, out double laneMetres)
+        {
             double referenceMetres = RunningTrackGeometry.FindNearestLaneMetres(lane, origin);
             Pose reference = RunningTrackGeometry.EvaluateLane(lane, referenceMetres);
-            laneMetres = referenceMetres + travelledMetres;
+            laneMetres = referenceMetres + (reverse ? -travelledMetres : travelledMetres);
             Pose current = RunningTrackGeometry.EvaluateLane(lane, laneMetres);
             Quaternion rotation = reference.rotation * Quaternion.Inverse(current.rotation);
             return new Pose(origin - rotation * current.position, rotation);
@@ -56,25 +62,69 @@ namespace PaceScape.RunningTrack
         // Returns a ghost pose in the moving track's frame. Positive gap places it ahead.
         public bool Evaluate(int lane, double laneMetres, Pose trackPose, double ghostGapMetres, out Pose pose)
         {
+            return EvaluateLane(lane, lane, laneMetres, trackPose, ghostGapMetres, true, false, out pose);
+        }
+
+        // Uses the next outer lane, or the inner neighbour at the outside edge.
+        internal bool EvaluateAdjacentLane(int lane, double laneMetres, Pose trackPose, double ghostGapMetres, out Pose pose)
+        {
+            return EvaluateLane(lane, NeighbourLane(lane), laneMetres, trackPose, ghostGapMetres, true, false, out pose);
+        }
+
+        internal bool EvaluateReplay(int lane, double laneMetres, Pose trackPose, double ghostGapMetres,
+            bool useAdjacentLane, out Pose pose)
+        {
+            return EvaluateDirectedGhost(lane, laneMetres, trackPose, ghostGapMetres, useAdjacentLane, true, false, out pose);
+        }
+
+        internal bool EvaluateDirectedGhost(int lane, double laneMetres, Pose trackPose, double ghostGapMetres,
+            bool useAdjacentLane, bool isReplay, bool reverse, out Pose pose)
+        {
+            return EvaluateLane(lane, useAdjacentLane ? NeighbourLane(lane) : lane, laneMetres, trackPose,
+                ghostGapMetres, !isReplay, reverse, out pose);
+        }
+
+        private static int NeighbourLane(int lane) => lane < RunningTrackGeometry.LaneCount ? lane + 1 : lane - 1;
+
+        private bool EvaluateLane(int lane, int ghostLane, double laneMetres, Pose trackPose, double ghostGapMetres,
+            bool limitVisibility, bool reverse, out Pose pose)
+        {
             pose = Pose.identity;
             if (double.IsNaN(ghostGapMetres) || double.IsInfinity(ghostGapMetres))
             {
                 return false;
             }
             // Hidden poses are bounded too, so very long sessions cannot move a renderer arbitrarily far away.
-            float gap = (float)Math.Max(-VisibilityDistanceMetres, Math.Min(VisibilityDistanceMetres, ghostGapMetres));
-            Pose lanePose = RunningTrackGeometry.EvaluateLane(lane, laneMetres + gap);
+            double gap = limitVisibility
+                ? Math.Max(-VisibilityDistanceMetres, Math.Min(VisibilityDistanceMetres, ghostGapMetres))
+                : ghostGapMetres % RunningTrackGeometry.GetLaneLength(lane);
+            Pose lanePose = RunningTrackGeometry.EvaluateLane(lane, laneMetres + (reverse ? -gap : gap));
+            if (ghostLane != lane)
+            {
+                double ghostMetres = RunningTrackGeometry.FindNearestLaneMetres(ghostLane, lanePose.position);
+                lanePose = RunningTrackGeometry.EvaluateLane(ghostLane, ghostMetres);
+            }
             pose = new Pose(trackPose.position + trackPose.rotation * lanePose.position,
-                trackPose.rotation * lanePose.rotation);
-            return Math.Abs(ghostGapMetres) <= VisibilityDistanceMetres;
+                trackPose.rotation * FaceDirection(lanePose.rotation, reverse));
+            return !limitVisibility || Math.Abs(ghostGapMetres) <= VisibilityDistanceMetres;
         }
 
         // Uses the lane tangent for heading and offsets from the calibrated treadmill position.
         public Pose EvaluateSideBySide(int lane, Vector3 origin)
         {
+            return EvaluateDirectedCompanion(lane, origin, false);
+        }
+
+        internal Pose EvaluateDirectedCompanion(int lane, Vector3 origin, bool reverse)
+        {
             double referenceMetres = RunningTrackGeometry.FindNearestLaneMetres(lane, origin);
-            Quaternion heading = RunningTrackGeometry.EvaluateLane(lane, referenceMetres).rotation;
+            Quaternion heading = FaceDirection(RunningTrackGeometry.EvaluateLane(lane, referenceMetres).rotation, reverse);
             return new Pose(origin + heading * Vector3.right * SideOffsetMetres, heading);
+        }
+
+        private static Quaternion FaceDirection(Quaternion heading, bool reverse)
+        {
+            return reverse ? heading * Quaternion.AngleAxis(180f, Vector3.up) : heading;
         }
 
         private static bool Finite(float value)
@@ -91,6 +141,7 @@ namespace PaceScape.RunningTrack
         public float sideOffsetMetres;
         public float visibilityDistanceMetres;
         public bool calibrated;
+        public bool reverseDirection;
         public bool visible;
         public string status;
     }

@@ -33,6 +33,10 @@ namespace PaceScape.RemoteControl
         public string deviceId;
         public int targetSpeedUnits;
         public string runnerMode;
+        public string runEnvironment;
+        public string ghostMode;
+        public bool reverseDirection;
+        public float manualTrackSpeedKmh;
         public string presentationMode;
         // Zero is outside the allowed offset range and stays valid JSON when Unity serializes an empty payload.
         public float sideOffsetMetres;
@@ -77,12 +81,19 @@ namespace PaceScape.RemoteControl
         public int ghostControlVersion;
         public int ghostPresentationVersion;
         public int sideBySideVersion;
+        public int manualModeVersion;
+        public int manualTrackSpeedVersion;
+        public float manualTrackSpeedKmh;
+        public int runSetupVersion;
+        public string runEnvironment;
+        public string ghostMode;
         public GhostPresentationState ghostPresentation;
         public string runnerMode;
         public int comparisonControlVersion;
         public PerformanceState performance;
         public float activeRunnerPace;
         public string runState;
+        public int runCountdownSeconds;
         public int runnableMarkers;
         public bool canRun;
         public float paceMinutesPerKilometre;
@@ -220,11 +231,11 @@ namespace PaceScape.RemoteControl
                     error = "Reset before changing presentation. Use Track or TreadmillRelative, side offset ±0.5–5 m and visibility distance 1–100 m. Relative mode needs at most one placement.";
                     return false;
                 case "runner.calibrate":
-                    if (tracker.TryCalibrateGhostPresentation())
+                    if (tracker.TryCalibrateGhostDirection(payload.reverseDirection))
                     {
                         return true;
                     }
-                    error = "Calibration requires Ready, treadmill-relative mode, one tracked marker and a tracked head pose. Face the treadmill running direction.";
+                    error = "Calibration requires Ready, a treadmill setting, one tracked marker and a tracked head pose.";
                     return false;
                 case "runner.comparison":
                     if (tracker.PerformanceSource != null && tracker.PerformanceSource.TryConfigure(
@@ -234,12 +245,19 @@ namespace PaceScape.RemoteControl
                     }
                     error = "Reset before changing comparison distance; pause before changing demonstration settings. Use whole metres, 1–1000000.";
                     return false;
+                case "runner.setup":
+                    if (tracker.TryConfigureRunSetup(payload.runEnvironment, payload.ghostMode))
+                    {
+                        return true;
+                    }
+                    error = "Reset before changing the run setup. Treadmill setups allow one marker and Side by Side requires a treadmill setup.";
+                    return false;
                 case "runner.mode":
                     if (tracker.TrySetRunnerMode(payload.runnerMode))
                     {
                         return true;
                     }
-                    error = "Use FixedPace, AllTimePersonalBest, or SideBySide. SideBySide requires a reset and at most one marker.";
+                    error = "Use Stadium, FixedPace, AllTimePersonalBest, SideBySide, or Manual. Stadium and companion modes require a ready run. Companion modes allow at most one marker.";
                     return false;
                 case "runner.configure":
                     if (tracker.TryConfigureRunner(payload.paceMinutesPerKilometre, payload.spawnLane,
@@ -265,7 +283,7 @@ namespace PaceScape.RemoteControl
                         return true;
                     }
 
-                    error = "Only a running session can be paused.";
+                    error = "Only a running session or a start countdown can be interrupted.";
                     return false;
                 case "run.resume":
                     if (tracker.TryResumeRun())
@@ -278,6 +296,13 @@ namespace PaceScape.RemoteControl
                 case "run.reset":
                     tracker.ResetRun();
                     return true;
+                case "runner.trackSpeed":
+                    if (tracker.TrySetManualTrackSpeed(payload.manualTrackSpeedKmh))
+                    {
+                        return true;
+                    }
+                    error = "Manual track speed requires treadmill mode without FTMS and a speed of 1–30 km/h.";
+                    return false;
                 case "runner.pace":
                     if (tracker.TrySetPace(payload.paceMinutesPerKilometre))
                     {

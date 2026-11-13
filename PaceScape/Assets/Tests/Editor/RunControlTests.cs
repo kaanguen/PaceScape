@@ -45,6 +45,35 @@ namespace PaceScape.Tests
             UnityEngine.Object.DestroyImmediate(_root);
         }
 
+        [TestCase("FixedPace")]
+        [TestCase("AllTimePersonalBest")]
+        [TestCase("SideBySide")]
+        [TestCase("Manual")]
+        public void StartCountdownReservesTheRunAndKeepsTheRunnerStillUntilConfirmed(string mode)
+        {
+            Assert.That(SessionCall("TrySetMode", mode), Is.True);
+            Vector3 start = _runner.transform.localPosition;
+            Assert.That(SessionCall("TryBeginCountdown", false), Is.False);
+            Assert.That(SessionCall("TryBeginCountdown", true), Is.True);
+            Assert.That(SessionCall("TryBeginCountdown", true), Is.False);
+            Assert.That(SessionCall("TryCompleteCountdown", true), Is.False);
+            Assert.That(SessionCall("TickCountdown", 2f), Is.False);
+            Advance();
+            Assert.That(_runner.transform.localPosition, Is.EqualTo(start));
+
+            Assert.That(SessionCall("TryPause"), Is.True);
+            Assert.That(SessionCall("TickCountdown", 3f), Is.False);
+            Assert.That(SessionCall("TryBeginCountdown", true), Is.True);
+            Assert.That(SessionCall("TickCountdown", 3f), Is.True);
+            Assert.That(SessionCall("TickCountdown", 1f), Is.False);
+            Advance();
+            Assert.That(_runner.transform.localPosition, Is.EqualTo(start));
+            Assert.That(SessionCall("TryCompleteCountdown", false), Is.False);
+            Assert.That(SessionCall("TryCompleteCountdown", true), Is.True);
+            Advance();
+            Assert.That(_runner.transform.localPosition, Is.Not.EqualTo(start));
+        }
+
         [Test]
         public void WaitingAndPausedSessionsDoNotMoveAndResumeContinuesFromTheSamePosition()
         {
@@ -120,9 +149,15 @@ namespace PaceScape.Tests
             Assert.That(_runner.transform.localPosition, Is.EqualTo(start));
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void TreadmillTrackFollowsMeasuredDistanceAndResets(bool sideBySide)
+        [TestCase("FTMS", "FixedPace", true)]
+        [TestCase("FTMS", "AllTimePersonalBest", true)]
+        [TestCase("FTMS", "SideBySide", true)]
+        [TestCase("Manual", "FixedPace", true)]
+        [TestCase("Manual", "AllTimePersonalBest", true)]
+        [TestCase("Manual", "SideBySide", true)]
+        [TestCase("Stadium", "FixedPace", false)]
+        [TestCase("Stadium", "AllTimePersonalBest", false)]
+        public void TrackFollowsEnvironmentSpeedRegardlessOfGhostMode(string environment, string ghostMode, bool moves)
         {
             var track = new GameObject("Track visual").transform;
             track.SetParent(_root.transform, false);
@@ -131,45 +166,122 @@ namespace PaceScape.Tests
             visualType.GetField("Track").SetValue(visual, track);
             visualType.GetField("HasGhostCalibration").SetValue(visual, true);
             visualType.GetField("GhostOrigin").SetValue(visual, Vector3.zero);
-            Component performance = _root.AddComponent(RuntimeType("Performance.RunnerPerformance"));
-            _tracker.GetType().GetProperty("PerformanceSource").SetValue(_tracker, performance);
-            object laps = performance.GetType().GetField("_laps", PrivateInstance).GetValue(performance);
-            MethodInfo advance = laps.GetType().GetMethod("Advance");
+            MethodInfo configure = _tracker.GetType().GetMethod("TryConfigureRunSetup", PrivateInstance);
+            MethodInfo advance = _tracker.GetType().GetMethod("AdvanceTrack", PrivateInstance);
             MethodInfo applyPresentation = _tracker.GetType().GetMethod("ApplyGhostPresentation");
-            if (sideBySide)
+            Assert.That(configure.Invoke(_tracker, new object[] { environment, ghostMode }), Is.True);
+            Assert.That(TrackerCall("TrySetPace", 8f), Is.True);
+            if (environment == "Manual")
             {
-                Assert.That(TrackerCall("TrySetRunnerMode", "SideBySide"), Is.True);
-            }
-            else
-            {
-                Assert.That(TrackerCall("TryConfigureGhostPresentation", "TreadmillRelative", 1.5f, 10f), Is.True);
+                Assert.That(_tracker.GetType().GetMethod("TrySetManualTrackSpeed", PrivateInstance)
+                    .Invoke(_tracker, new object[] { 12f }), Is.True);
             }
             Vector3 start = track.localPosition;
             Vector3 companionStart = _runner.transform.localPosition;
 
             Assert.That(SessionCall("TryStart", true), Is.True);
-            advance.Invoke(laps, new object[] { 2.0, 9.0 });
+            advance.Invoke(_tracker, new object[] { 2f, environment == "Manual" ? 0.0 : 2.5 });
             applyPresentation.Invoke(_tracker, null);
-            Assert.That(track.localPosition.z, Is.EqualTo(start.z - 5f).Within(0.0001f));
-            if (sideBySide)
+            float expectedTravel = !moves ? 0f : environment == "Manual" ? 20f / 3f : 5f;
+            Assert.That(track.localPosition.z, Is.EqualTo(start.z - expectedTravel).Within(0.0001f));
+            if (ghostMode == "SideBySide")
             {
-                Assert.That(_runner.transform.localPosition, Is.EqualTo(companionStart));
+                Assert.That(Vector3.Distance(_runner.transform.localPosition, companionStart), Is.LessThan(0.0001f));
             }
 
             Vector3 movingPosition = track.localPosition;
-            advance.Invoke(laps, new object[] { 1.0, 0.0 });
-            applyPresentation.Invoke(_tracker, null);
-            Assert.That(track.localPosition, Is.EqualTo(movingPosition));
             Assert.That(SessionCall("TryPause"), Is.True);
+            advance.Invoke(_tracker, new object[] { 1f, 2.5 });
             applyPresentation.Invoke(_tracker, null);
             Assert.That(track.localPosition, Is.EqualTo(movingPosition));
             _tracker.GetType().GetMethod("ResetRun").Invoke(_tracker, null);
             Assert.That(track.localPosition, Is.EqualTo(start));
 
-            Assert.That(TrackerCall("TrySetRunnerMode", "FixedPace"), Is.True);
-            Assert.That(TrackerCall("TryConfigureGhostPresentation", "Track", 1.5f, 10f), Is.True);
+            Assert.That(configure.Invoke(_tracker, new object[] { "Stadium", "FixedPace" }), Is.True);
             Assert.That(track.localPosition, Is.EqualTo(Vector3.zero));
             Assert.That(track.localRotation, Is.EqualTo(Quaternion.identity));
+        }
+
+        [Test]
+        public void ManualModeMovesTrackAtSelectedPaceAndKeepsCompanionBesideTheStart()
+        {
+            var track = new GameObject("Track visual").transform;
+            track.SetParent(_root.transform, false);
+            object visual = _markers[1UL];
+            Type visualType = visual.GetType();
+            visualType.GetField("Track").SetValue(visual, track);
+            visualType.GetField("HasGhostCalibration").SetValue(visual, true);
+            Assert.That(TrackerCall("TrySetRunnerMode", "Manual"), Is.True);
+            MethodInfo setSpeed = _tracker.GetType().GetMethod("TrySetManualTrackSpeed", PrivateInstance);
+            Assert.That(setSpeed.Invoke(_tracker, new object[] { 12f }), Is.True);
+            Vector3 start = track.localPosition;
+            Vector3 companionStart = _runner.transform.localPosition;
+            MethodInfo advance = _tracker.GetType().GetMethod("AdvanceCompanion", PrivateInstance);
+            MethodInfo advanceTrack = _tracker.GetType().GetMethod("AdvanceTrack", PrivateInstance);
+            MethodInfo present = _tracker.GetType().GetMethod("ApplyGhostPresentation");
+
+            Assert.That(SessionCall("TryStart", true), Is.True);
+            advance.Invoke(_tracker, new object[] { _motion, 3f, 0.0 });
+            advanceTrack.Invoke(_tracker, new object[] { 3f, 0.0 });
+            present.Invoke(_tracker, null);
+            Assert.That(track.localPosition.z, Is.EqualTo(start.z - 10f).Within(0.0001f));
+            Assert.That(Vector3.Distance(_runner.transform.localPosition, companionStart), Is.LessThan(0.0001f));
+            Assert.That(TrackerCall("TrySetRunnerMode", "FixedPace"), Is.False);
+
+            Assert.That(TrackerCall("TrySetPace", 10f), Is.True);
+            Assert.That(Property("ActivePaceMinutesPerKilometre"), Is.EqualTo(5f));
+            Assert.That(setSpeed.Invoke(_tracker, new object[] { 6f }), Is.True);
+            advance.Invoke(_tracker, new object[] { _motion, 3f, 0.0 });
+            advanceTrack.Invoke(_tracker, new object[] { 3f, 0.0 });
+            present.Invoke(_tracker, null);
+            Assert.That(_motion.GetType().GetProperty("TravelledMetres").GetValue(_motion), Is.EqualTo(15.0).Within(0.0001));
+            Assert.That(track.localPosition.z, Is.LessThan(start.z - 10f));
+            Vector3 movingPosition = track.localPosition;
+            Quaternion movingRotation = track.localRotation;
+            Assert.That(SessionCall("TryPause"), Is.True);
+            advance.Invoke(_tracker, new object[] { _motion, 3f, 0.0 });
+            present.Invoke(_tracker, null);
+            Assert.That(track.localPosition, Is.EqualTo(movingPosition));
+            Assert.That(track.localRotation, Is.EqualTo(movingRotation));
+            Assert.That(_motion.GetType().GetProperty("TravelledMetres").GetValue(_motion), Is.EqualTo(15.0).Within(0.0001));
+            _tracker.GetType().GetMethod("ResetRun").Invoke(_tracker, null);
+            Assert.That(track.localPosition, Is.EqualTo(start));
+        }
+
+        [Test]
+        public void ManualTrackSpeedDoesNotChangeTheExamplePrGhostPace()
+        {
+            Component performance = _root.AddComponent(RuntimeType("Performance.RunnerPerformance"));
+            _tracker.GetType().GetProperty("PerformanceSource").SetValue(_tracker, performance);
+            Assert.That(performance.GetType().GetMethod("TryConfigure")
+                .Invoke(performance, new object[] { 5000f, true }), Is.True);
+            Assert.That(_tracker.GetType().GetMethod("TryConfigureRunSetup", PrivateInstance)
+                .Invoke(_tracker, new object[] { "Manual", "AllTimePersonalBest" }), Is.True);
+            MethodInfo setSpeed = _tracker.GetType().GetMethod("TrySetManualTrackSpeed", PrivateInstance);
+            Assert.That(setSpeed.Invoke(_tracker, new object[] { 8f }), Is.True);
+            Assert.That(Property("ActivePaceMinutesPerKilometre"), Is.EqualTo(5f));
+
+            MethodInfo advance = performance.GetType().GetMethod("AdvanceGhost");
+            double travel = (double)advance.Invoke(performance, new object[] { 3f, 0.0, 6f });
+            Assert.That(setSpeed.Invoke(_tracker, new object[] { 16f }), Is.True);
+            Assert.That(Property("ActivePaceMinutesPerKilometre"), Is.EqualTo(5f).Within(0.001f));
+            Assert.That(advance.Invoke(performance, new object[] { 3f, travel, 6f }), Is.EqualTo(travel).Within(0.001));
+        }
+
+        [Test]
+        public void RunSetupSelectsEnvironmentAndGhostIndependently()
+        {
+            MethodInfo configure = _tracker.GetType().GetMethod("TryConfigureRunSetup", PrivateInstance);
+            Assert.That(configure.Invoke(_tracker, new object[] { "Manual", "AllTimePersonalBest" }), Is.True);
+            Assert.That(Property("IsManual"), Is.True);
+            Assert.That(Property("Mode").ToString(), Is.EqualTo("AllTimePersonalBest"));
+            Assert.That(configure.Invoke(_tracker, new object[] { "Stadium", "SideBySide" }), Is.False);
+            Assert.That(Property("IsManual"), Is.True);
+            Assert.That(configure.Invoke(_tracker, new object[] { "FTMS", "SideBySide" }), Is.True);
+            Assert.That(Property("IsManual"), Is.False);
+            Assert.That(Property("Mode").ToString(), Is.EqualTo("SideBySide"));
+            Assert.That(configure.Invoke(_tracker, new object[] { "Stadium", "FixedPace" }), Is.True);
+            Assert.That(Property("Mode").ToString(), Is.EqualTo("FixedPace"));
         }
 
         [Test]
