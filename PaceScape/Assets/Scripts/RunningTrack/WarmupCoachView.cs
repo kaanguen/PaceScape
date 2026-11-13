@@ -17,6 +17,8 @@ namespace PaceScape.RunningTrack
         private readonly Transform _model;
         private readonly Bounds _standingBounds;
         private readonly int _renderedLayers;
+        private TextMesh _countdown;
+        private int _displayedSeconds;
 
         private WarmupCoachView(GameObject instance, Camera camera)
         {
@@ -87,6 +89,43 @@ namespace PaceScape.RunningTrack
         /// <summary>Gets the animator used by the exercise player.</summary>
         public Animator Animator { get; }
 
+        /// <summary>Shows the seconds until the first exercise, or hides the countdown at zero.</summary>
+        public void ShowCountdown(int seconds)
+        {
+            if (_displayedSeconds == seconds)
+            {
+                return;
+            }
+
+            _displayedSeconds = seconds;
+            if (seconds == 0)
+            {
+                if (_countdown != null)
+                {
+                    Release(_countdown.gameObject);
+                    _countdown = null;
+                }
+                return;
+            }
+
+            if (_countdown == null)
+            {
+                var label = new GameObject("Warm-up countdown", typeof(TextMesh));
+                label.layer = _model.gameObject.layer;
+                label.transform.SetParent(_camera.transform, false);
+                _countdown = label.GetComponent<TextMesh>();
+                _countdown.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                _countdown.fontSize = 96;
+                _countdown.fontStyle = FontStyle.Bold;
+                _countdown.anchor = TextAnchor.MiddleCenter;
+                _countdown.color = Color.white;
+                label.GetComponent<MeshRenderer>().sharedMaterial = _countdown.font.material;
+                LayoutCountdown(Mathf.Max(PreferredDepth, _camera.nearClipPlane + DepthClearance));
+            }
+
+            _countdown.text = seconds.ToString();
+        }
+
         internal bool IsAvailable(Camera camera)
         {
             return _camera != null && _camera == camera && _camera.isActiveAndEnabled &&
@@ -122,12 +161,26 @@ namespace PaceScape.RunningTrack
             Quaternion rotation = Quaternion.LookRotation(new Vector3(-cameraSpace.x, 0f, -cameraSpace.z), Vector3.up);
             _model.localScale = Vector3.one * scale;
             _model.SetLocalPositionAndRotation(cameraSpace - rotation * (_standingBounds.center * scale), rotation);
+            if (_countdown != null)
+            {
+                LayoutCountdown(depth);
+            }
             return true;
+        }
+
+        private void LayoutCountdown(float depth)
+        {
+            Vector3 centre = _camera.ViewportToWorldPoint(new Vector3(0.5f, 0.62f, depth));
+            Vector3 top = _camera.ViewportToWorldPoint(new Vector3(0.5f, 0.76f, depth));
+            _countdown.transform.localPosition = _camera.transform.InverseTransformPoint(centre);
+            // TextMesh glyphs use world units independent of the font's raster size.
+            _countdown.transform.localScale = Vector3.one * (Vector3.Distance(centre, top) / 12f);
         }
 
         /// <summary>Hides the avatar immediately and releases its instance.</summary>
         public void Dispose()
         {
+            ShowCountdown(0);
             if (_model == null)
             {
                 return;

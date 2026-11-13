@@ -9,6 +9,7 @@ namespace PaceScape.RunningTrack
         public const string JumpingJacks = "Mixamo_StartJumpingJacks";
         public const string AirSquat = "Mixamo_AirSquat";
         public const int MaxSteps = 20;
+        private const float CountdownSeconds = 3f;
         private const float BlendSeconds = 0.2f;
         private static readonly int _idleState = StateHash("Idle");
 
@@ -32,16 +33,21 @@ namespace PaceScape.RunningTrack
             public string animationId;
             public float stepElapsed;
             public float stepDuration;
+            public float countdownRemaining;
         }
 
         private Animator _animator;
         private Step[] _steps;
         private int _stepIndex;
         private float _stepElapsed;
+        private float _countdownRemaining;
         private string _status = "Idle";
 
         /// <summary>Whether the sequence currently owns the runner's animation.</summary>
         public bool Active => _steps != null;
+
+        /// <summary>Gets the whole seconds to show before the first exercise starts.</summary>
+        public int CountdownDisplay => Mathf.CeilToInt(_countdownRemaining);
 
         /// <summary>Whether the runner supports the complete warm-up catalogue.</summary>
         public static bool Supports(Animator animator)
@@ -81,9 +87,10 @@ namespace PaceScape.RunningTrack
             _steps = (Step[])steps.Clone();
             _stepIndex = 0;
             _stepElapsed = 0f;
-            _status = "Playing";
+            _countdownRemaining = CountdownSeconds;
+            _status = "Countdown";
             _animator = animator;
-            PlayCurrent();
+            _animator.Play(_idleState, 0, 0f);
             return true;
         }
 
@@ -93,6 +100,20 @@ namespace PaceScape.RunningTrack
             if (!Active || !(deltaSeconds > 0f) || float.IsInfinity(deltaSeconds))
             {
                 return;
+            }
+
+            bool isStarting = _countdownRemaining > 0f;
+            if (isStarting)
+            {
+                float countdownTime = Mathf.Min(deltaSeconds, _countdownRemaining);
+                _countdownRemaining -= countdownTime;
+                if (_countdownRemaining > 0f)
+                {
+                    return;
+                }
+
+                deltaSeconds -= countdownTime;
+                _status = "Playing";
             }
 
             string previous = _steps[_stepIndex].animationId;
@@ -107,7 +128,7 @@ namespace PaceScape.RunningTrack
                     return;
                 }
             }
-            if (_steps[_stepIndex].animationId != previous)
+            if (isStarting || _steps[_stepIndex].animationId != previous)
             {
                 PlayCurrent();
             }
@@ -116,7 +137,7 @@ namespace PaceScape.RunningTrack
         /// <summary>Skips the active exercise or completes the sequence at its last step.</summary>
         public bool TryNext()
         {
-            if (!Active)
+            if (!Active || _countdownRemaining > 0f)
             {
                 return false;
             }
@@ -149,6 +170,7 @@ namespace PaceScape.RunningTrack
             }
             _animator = null;
             _steps = null;
+            _countdownRemaining = 0f;
             _status = status;
             return true;
         }
@@ -165,7 +187,8 @@ namespace PaceScape.RunningTrack
                 stepCount = Active ? _steps.Length : 0,
                 animationId = Active ? _steps[_stepIndex].animationId : null,
                 stepElapsed = Active ? _stepElapsed : 0f,
-                stepDuration = Active ? _steps[_stepIndex].seconds : 0f
+                stepDuration = Active ? _steps[_stepIndex].seconds : 0f,
+                countdownRemaining = _countdownRemaining
             };
         }
 

@@ -54,7 +54,10 @@ namespace PaceScape.Tests
             Array plan = MakePlan(1.5f, 2f);
             Assert.That(Start(plan), Is.True);
             Assert.That(Start(plan), Is.False);
-            Assert.That(_camera.transform.childCount, Is.EqualTo(1));
+            Assert.That(_camera.transform.childCount, Is.EqualTo(2));
+            Assert.That(State("status"), Is.EqualTo("Countdown"));
+            Assert.That(State("countdownRemaining"), Is.EqualTo(3f));
+            Assert.That(_trackerType.GetMethod("TryNextWarmupExercise").Invoke(_tracker, null), Is.False);
 
             var animator = _camera.GetComponentInChildren<Animator>();
             Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
@@ -62,7 +65,16 @@ namespace PaceScape.Tests
             Assert.That(viewport.x, Is.InRange(0.5f, 1f));
             Assert.That(viewport.y, Is.InRange(0f, 0.5f));
             _camera.transform.SetPositionAndRotation(Vector3.one, Quaternion.Euler(30f, 80f, 12f));
-            UpdateWarmup(1.75f);
+            UpdateWarmup(2f);
+            Assert.That(State("stepIndex"), Is.Zero);
+            Assert.That(State("stepElapsed"), Is.Zero);
+            Assert.That(State("countdownRemaining"), Is.EqualTo(1f));
+            var countdown = _camera.GetComponentInChildren<TextMesh>();
+            Assert.That(countdown.text, Is.EqualTo("1"));
+            Assert.That(countdown.font, Is.Not.Null);
+            UpdateWarmup(2.75f);
+            Assert.That(State("status"), Is.EqualTo("Playing"));
+            Assert.That(_camera.GetComponentInChildren<TextMesh>(), Is.Null);
             Assert.That(Vector3.Distance(viewport, _camera.WorldToViewportPoint(head.position)), Is.LessThan(0.001f));
             Assert.That(State("stepIndex"), Is.EqualTo(1));
             Assert.That(State("stepElapsed"), Is.EqualTo(0.25f).Within(0.001f));

@@ -193,6 +193,11 @@ namespace PaceScape.RemoteControl
                     error = "Warm-up requires a tracked headset in Ready, a visible coach and 1–20 supported exercises of 1–300 seconds.";
                     return false;
                 case "exercise.nextWarmup":
+                    if (tracker.CaptureWarmup(false).countdownRemaining > 0f)
+                    {
+                        error = "Wait for the warm-up countdown to finish before skipping an exercise.";
+                        return false;
+                    }
                     if (tracker.TryNextWarmupExercise())
                     {
                         return true;

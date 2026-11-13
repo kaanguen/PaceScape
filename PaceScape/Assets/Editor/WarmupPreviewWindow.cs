@@ -58,6 +58,10 @@ namespace PaceScape.Editor
                     HideCoach();
                     _status.text = "Wähle eine Dauer zwischen 1 und 300 Sekunden. Der Coach benötigt seinen Warm-up-Animator.";
                 }
+                else
+                {
+                    ShowCountdown(_warmup.CountdownDisplay);
+                }
                 _image.MarkDirtyRepaint();
             }) { text = "Abspielen" });
             buttons.Add(new Button(() =>
@@ -136,8 +140,13 @@ namespace PaceScape.Editor
             if (_warmup.Active)
             {
                 _coach.Animator.Update(delta);
-                RunnerWarmup.State state = _warmup.CaptureState(false);
-                _status.text = $"{state.stepElapsed:F1} / {state.stepDuration:F1} s";
+                int countdown = _warmup.CountdownDisplay;
+                ShowCountdown(countdown);
+                if (countdown == 0)
+                {
+                    RunnerWarmup.State state = _warmup.CaptureState(false);
+                    _status.text = $"{state.stepElapsed:F1} / {state.stepDuration:F1} s";
+                }
             }
             else
             {
@@ -145,6 +154,15 @@ namespace PaceScape.Editor
                 _status.text = "Abgeschlossen";
             }
             _image?.MarkDirtyRepaint();
+        }
+
+        private void ShowCountdown(int seconds)
+        {
+            _coach.ShowCountdown(seconds);
+            if (seconds > 0)
+            {
+                _status.text = $"Warm-up startet in {seconds} s";
+            }
         }
 
         private void DrawPreview()

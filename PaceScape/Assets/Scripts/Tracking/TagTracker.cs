@@ -192,6 +192,7 @@ namespace PaceScape.Tracking
             }
             if (_warmup.TryStart(_warmupCoach.Animator, steps))
             {
+                _warmupCoach.ShowCountdown(_warmup.CountdownDisplay);
                 return true;
             }
 
@@ -1124,6 +1125,10 @@ namespace PaceScape.Tracking
             if (!_warmup.Active)
             {
                 StopWarmup();
+            }
+            else
+            {
+                _warmupCoach.ShowCountdown(_warmup.CountdownDisplay);
             }
         }
 
