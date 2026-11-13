@@ -150,6 +150,8 @@ Die folgenden Zeitwerte dienen als Beispiel für das Protokoll.
 }
 ```
 
-`exercise.nextWarmup` überspringt die aktuelle Übung und `exercise.stopWarmup` beendet die Sequenz. Beide Befehle verwenden `"payload": {}`. In `state.warmup` stehen `active`, `canStart`, `status`, der nullbasierte `stepIndex`, `stepCount`, `animationId`, `stepElapsed` und `stepDuration`. Außerhalb einer aktiven Sequenz ist `stepIndex` gleich −1. Bei Abbruch meldet `status` je nach Ursache `TrackingLost`, `ConnectionLost` oder `ViewUnavailable`.
+Nach dem Start zeigt die App im Sichtfeld drei Sekunden lang den Countdown 3–2–1. Der Coach wartet in seiner Ruheanimation. Erst danach läuft die erste Übung mit ihrer vollen eingestellten Dauer. Die Unity-Vorschau zeigt denselben Countdown.
+
+`exercise.nextWarmup` überspringt nach dem Countdown die aktuelle Übung. `exercise.stopWarmup` beendet die Sequenz auch während des Countdowns. Beide Befehle verwenden `"payload": {}`. In `state.warmup` stehen `active`, `canStart`, `status`, der nullbasierte `stepIndex`, `stepCount`, `animationId`, `stepElapsed` und `stepDuration`. Während `status` den Wert `Countdown` hat, zählt `countdownRemaining` die verbleibenden Sekunden und `stepElapsed` bleibt bei 0. Außerhalb einer aktiven Sequenz ist `stepIndex` gleich −1. Bei Abbruch meldet `status` je nach Ursache `TrackingLost`, `ConnectionLost` oder `ViewUnavailable`.
 
 In Unity zeigt **PaceScape → Warm-up-Vorschau** beide Übungen aus der Kameraperspektive ohne WebSocket-Verbindung. Mit **Kopfdrehung** lässt sich die feste Position im Sichtfeld prüfen. Im aktualisierten PaceScape-Control-Dashboard findest du **Warm-up** als eigenen Reiter in der Hauptnavigation. Dort kannst du eine Übungsfolge zusammenstellen, starten, überspringen und beenden. Mit `npm run simulate` lässt sich der Ablauf auch ohne Brille ausprobieren. Die Marker-freie Server-Testszene meldet keine Warm-up-Unterstützung.
