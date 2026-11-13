@@ -59,6 +59,28 @@ namespace PaceScape.Tests
         [TestCase(5.0)]
         [TestCase(35.0)]
         [TestCase(435.0)]
+        public void AdjacentLaneKeepsLateralSeparationAtTheSameTrackStation(double travel)
+        {
+            object settings = Create("RunningTrack.TreadmillGhostPresentation");
+            MethodInfo evaluate = settings.GetType().GetMethod("EvaluateAdjacentLane", PrivateInstance);
+            foreach (int lane in new[] { 1, 8 })
+            {
+                foreach (double gap in new[] { -4.0, 0.0, 4.0 })
+                {
+                    object[] args = { lane, travel, Pose.identity, gap, Pose.identity };
+                    Assert.That(evaluate.Invoke(settings, args), Is.True);
+                    Pose runner = EvaluateLane(lane, travel + gap);
+                    Pose ghost = (Pose)args[4];
+                    Vector3 separation = Quaternion.Inverse(runner.rotation) * (ghost.position - runner.position);
+                    Assert.That(separation.x, Is.EqualTo(lane == 1 ? 1.22f : -1.22f).Within(0.001f));
+                    Assert.That(separation.z, Is.EqualTo(0f).Within(0.001f));
+                }
+            }
+        }
+
+        [TestCase(5.0)]
+        [TestCase(35.0)]
+        [TestCase(435.0)]
         public void MovingTrackKeepsTheCurrentLaneUnderTheCalibration(double travel)
         {
             var origin = new Vector3(2, 0, 1);
@@ -94,6 +116,45 @@ namespace PaceScape.Tests
             object[] args = { 1, 0.0, Pose.identity, gap, Pose.identity };
             Assert.That(Call(settings, "Evaluate", args), Is.EqualTo(expected));
             Assert.That(Mathf.Abs(((Pose)args[4]).position.z), Is.LessThanOrEqualTo(10));
+        }
+
+        [Test]
+        public void ReverseCalibrationKeepsTheStartPointAndReversesHeadingAndProgress()
+        {
+            Type type = RuntimeType("RunningTrack.TreadmillGhostPresentation");
+            var origin = new Vector3(2f, 0f, 1f);
+            object[] trackArgs = { 1, origin, 30.0, true, 0.0 };
+            Pose track = (Pose)type.GetMethod("EvaluateDirectedTrackPose", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, trackArgs);
+            double laneMetres = (double)trackArgs[4];
+            Assert.That(laneMetres, Is.EqualTo(-29.0).Within(0.0001));
+            Pose lane = EvaluateLane(1, laneMetres);
+            Assert.That(Vector3.Distance(track.position + track.rotation * lane.position, origin), Is.LessThan(0.0001f));
+
+            object settings = Create("RunningTrack.TreadmillGhostPresentation");
+            MethodInfo evaluate = type.GetMethod("EvaluateDirectedGhost", PrivateInstance);
+            object[] ghostArgs = { 1, laneMetres, track, 5.0, false, true, true, Pose.identity };
+            Assert.That(evaluate.Invoke(settings, ghostArgs), Is.True);
+            Pose ghost = (Pose)ghostArgs[7];
+            Assert.That(ghost.position.z, Is.EqualTo(origin.z - 5f).Within(0.0001f));
+            Assert.That(Vector3.Angle(ghost.rotation * Vector3.forward, Vector3.back), Is.LessThan(0.01f));
+        }
+
+        [Test]
+        public void ReplayStaysVisibleBeyondTheLegacyDistanceInEitherDirection()
+        {
+            object settings = Create("RunningTrack.TreadmillGhostPresentation");
+            MethodInfo evaluate = settings.GetType().GetMethod("EvaluateReplay", PrivateInstance);
+            foreach (double gap in new[] { -405.0, -120.0, 120.0, 405.0 })
+            {
+                object[] args = { 1, 0.0, Pose.identity, gap, false, Pose.identity };
+                Assert.That(evaluate.Invoke(settings, args), Is.True);
+                Assert.That(Vector3.Distance(((Pose)args[5]).position, EvaluateLane(1, gap).position), Is.LessThan(0.001f));
+                args[4] = true;
+                Assert.That(evaluate.Invoke(settings, args), Is.True);
+                Assert.That(Vector3.Distance(((Pose)args[5]).position, EvaluateLane(1, gap).position),
+                    Is.EqualTo(1.22f).Within(0.001f));
+            }
         }
 
         [Test]

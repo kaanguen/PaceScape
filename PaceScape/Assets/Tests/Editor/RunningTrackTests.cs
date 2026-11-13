@@ -271,6 +271,13 @@ namespace PaceScape.Tests
                 Assert.That(animator.applyRootMotion, Is.False);
                 Assert.That(animator.updateMode, Is.EqualTo(AnimatorUpdateMode.UnscaledTime));
                 Assert.That(animator.fireEvents, Is.False);
+
+                motionType.GetMethod("ResetToStart").Invoke(motion, null);
+                Assert.That(animator.GetFloat("Speed"), Is.Zero);
+                Assert.That(animator.GetFloat("PlaybackRate"), Is.EqualTo(1f));
+                animator.Update(1f / 60f);
+                Assert.That(animator.GetCurrentAnimatorClipInfo(0), Has.Length.EqualTo(1));
+                Assert.That(animator.GetCurrentAnimatorClipInfo(0)[0].clip.averageSpeed.sqrMagnitude, Is.LessThan(0.01f));
             }
             finally
             {

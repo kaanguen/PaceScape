@@ -90,6 +90,7 @@ namespace PaceScape.RunningTrack
             _hasAdvanced = false;
             _speed = 0;
             _distance = -_distanceBehindStartLine % RunningTrackGeometry.GetLaneLength(_lane);
+            UpdateAnimation(0f);
             ApplyPose();
         }
 

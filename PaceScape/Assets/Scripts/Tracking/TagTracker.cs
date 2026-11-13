@@ -108,12 +108,78 @@ namespace PaceScape.Tracking
 
         public bool IsSideBySide => Mode == RunningSession.RunnerMode.SideBySide;
 
-        private bool UsesTreadmillPlacement => IsSideBySide || _ghostPresentation.Enabled;
+        /// <summary>Whether the operator sets the speed of both the track and its companion.</summary>
+        public bool IsManual => _manualEnvironment || Mode == RunningSession.RunnerMode.Manual;
+
+        private bool _manualEnvironment;
+        private float _manualTrackSpeedKmh = 10f;
+        private double _trackTravelledMetres;
+        private bool UsesCompanionPlacement => IsSideBySide || Mode == RunningSession.RunnerMode.Manual ||
+            (IsManual && Mode == RunningSession.RunnerMode.FixedPace);
+        private bool UsesRelativePlacement => UsesCompanionPlacement || IsManual || _ghostPresentation.Enabled;
+
+        internal string RunEnvironment => IsManual ? "Manual" : UsesRelativePlacement ? "FTMS" : "Stadium";
+        internal string GhostMode => UsesCompanionPlacement ? "SideBySide" : Mode.ToString();
+        internal float ManualTrackSpeedKmh => _manualTrackSpeedKmh;
+
+        internal bool TrySetManualTrackSpeed(float speedKmh)
+        {
+            if (!IsManual || !(speedKmh >= 1f && speedKmh <= 30f))
+            {
+                return false;
+            }
+
+            _manualTrackSpeedKmh = speedKmh;
+            return true;
+        }
+
+        internal bool TryConfigureRunSetup(string environment, string ghostMode)
+        {
+            if (RunState != RunningSession.RunState.Ready ||
+                (environment != "Stadium" && environment != "FTMS" && environment != "Manual") ||
+                (ghostMode != "FixedPace" && ghostMode != "AllTimePersonalBest" && ghostMode != "SideBySide") ||
+                (environment == "Stadium" && ghostMode == "SideBySide") ||
+                (environment != "Stadium" && _markers.Count + _pendingMarkers.Count > 1))
+            {
+                return false;
+            }
+
+            if (!_runSession.TrySetMode(ghostMode))
+            {
+                return false;
+            }
+            _manualEnvironment = environment == "Manual";
+            _trackTravelledMetres = 0;
+            _ghostPresentation.TryConfigure(environment == "FTMS" ? "TreadmillRelative" : "Track",
+                _ghostPresentation.SideOffsetMetres, _ghostPresentation.VisibilityDistanceMetres);
+            PerformanceSource?.RunnerModeChanged();
+            ApplyGhostPresentation();
+            return true;
+        }
 
         // Gets the active pace in minutes per kilometre; zero denotes a stopped or unavailable belt.
-        public float ActivePaceMinutesPerKilometre => PerformanceSource != null
-            ? PerformanceSource.GetTargetPace(Mode, _paceMinutesPerKilometre)
-            : IsSideBySide ? 0 : _paceMinutesPerKilometre;
+        public float ActivePaceMinutesPerKilometre
+        {
+            get
+            {
+                if (Mode == RunningSession.RunnerMode.AllTimePersonalBest)
+                {
+                    return PerformanceSource?.GetTargetPace(Mode, _paceMinutesPerKilometre) ?? _paceMinutesPerKilometre;
+                }
+
+                if (UsesCompanionPlacement)
+                {
+                    if (IsManual)
+                    {
+                        return 60f / _manualTrackSpeedKmh;
+                    }
+
+                    return PerformanceSource?.GetTargetPace(Mode, _paceMinutesPerKilometre) ?? 0f;
+                }
+
+                return _paceMinutesPerKilometre;
+            }
+        }
 
         // Gets or assigns the separate belt-measurement and record owner.
         public RunnerPerformance PerformanceSource { get; set; }
@@ -121,15 +187,44 @@ namespace PaceScape.Tracking
         // Selects the runner mode and pauses a running session when the mode changes.
         public bool TrySetRunnerMode(string mode)
         {
-            if (mode == nameof(RunningSession.RunnerMode.SideBySide) && !IsSideBySide &&
-                (RunState != RunningSession.RunState.Ready || _markers.Count + _pendingMarkers.Count > 1))
+            bool selectsStadium = mode == "Stadium";
+            if (selectsStadium)
+            {
+                if (RunState != RunningSession.RunState.Ready)
+                {
+                    return false;
+                }
+                mode = nameof(RunningSession.RunnerMode.FixedPace);
+            }
+
+            if (RunState == RunningSession.RunState.Countdown)
+            {
+                return false;
+            }
+
+            bool selectsManual = mode == nameof(RunningSession.RunnerMode.Manual);
+            bool entersCompanionMode = (selectsManual && !IsManual) ||
+                (mode == nameof(RunningSession.RunnerMode.SideBySide) && !IsSideBySide);
+            if ((entersCompanionMode && (RunState != RunningSession.RunState.Ready ||
+                _markers.Count + _pendingMarkers.Count > 1)) ||
+                (IsManual && !selectsManual && RunState != RunningSession.RunState.Ready))
             {
                 return false;
             }
 
             RunningSession.RunnerMode previous = Mode;
             bool success = _runSession.TrySetMode(mode);
-            if (success && previous != Mode)
+            if (success && selectsStadium)
+            {
+                _manualEnvironment = false;
+                _trackTravelledMetres = 0;
+            }
+            if (success && selectsStadium)
+            {
+                _ghostPresentation.TryConfigure("Track", _ghostPresentation.SideOffsetMetres,
+                    _ghostPresentation.VisibilityDistanceMetres);
+            }
+            if (success && (previous != Mode || selectsStadium))
             {
                 PerformanceSource?.RunnerModeChanged();
                 ApplyGhostPresentation();
@@ -175,7 +270,8 @@ namespace PaceScape.Tracking
         // Reports whether the foreground tracking session can start or resume all placed objects.
         public bool CanRun => !_warmup.Active && isActiveAndEnabled && IsForeground && _hasHeadTracking &&
             _startupPhase == StartupPhase.Ready && _markers.Count > 0 && RunnableMarkerCount == _markers.Count &&
-            (!UsesTreadmillPlacement || (HasGhostCalibration && PerformanceSource != null && PerformanceSource.HasFreshInput));
+            (!UsesRelativePlacement || (HasGhostCalibration &&
+                (IsManual || (PerformanceSource != null && PerformanceSource.HasFreshInput))));
 
         private bool CanStartWarmup => !_warmup.Active && RunState == RunningSession.RunState.Ready &&
             isActiveAndEnabled && IsForeground && _hasHeadTracking && Phase == StartupPhase.Ready &&
@@ -227,7 +323,7 @@ namespace PaceScape.Tracking
         }
 
         // Gets the initial longitudinal separation used only by the relative distance display.
-        public float RelativeStartOffset => !IsSideBySide && _ghostPresentation.Enabled ? _distanceBehindStartLine : 0;
+        public float RelativeStartOffset => !UsesCompanionPlacement && _ghostPresentation.Enabled ? _distanceBehindStartLine : 0;
 
         private bool HasGhostCalibration
         {
@@ -248,7 +344,7 @@ namespace PaceScape.Tracking
         // Changes only presentation while Ready; treadmill-relative placement uses exactly one marker.
         public bool TryConfigureGhostPresentation(string mode, float sideOffset, float visibilityDistance)
         {
-            if (RunState != RunningSession.RunState.Ready ||
+            if (IsManual || RunState != RunningSession.RunState.Ready ||
                 (mode == "TreadmillRelative" && _markers.Count + _pendingMarkers.Count > 1) ||
                 !_ghostPresentation.TryConfigure(mode, sideOffset, visibilityDistance))
             {
@@ -261,7 +357,12 @@ namespace PaceScape.Tracking
         // Locks the floor point below the head for the lane-relative reference.
         public bool TryCalibrateGhostPresentation()
         {
-            if (!UsesTreadmillPlacement || RunState != RunningSession.RunState.Ready ||
+            return TryCalibrateGhostDirection(false);
+        }
+
+        internal bool TryCalibrateGhostDirection(bool reverseDirection)
+        {
+            if (!UsesRelativePlacement || RunState != RunningSession.RunState.Ready ||
                 _markers.Count != 1 || RunnableMarkerCount != 1 || !_hasHeadTracking || !IsForeground ||
                 _xrOrigin == null || _xrOrigin.Camera == null)
             {
@@ -277,16 +378,17 @@ namespace PaceScape.Tracking
                     return false;
                 }
                 marker.GhostOrigin = origin;
+                marker.ReverseGhostDirection = reverseDirection;
                 marker.HasGhostCalibration = true;
             }
             ApplyGhostPresentation();
             return true;
         }
 
-        // Presents the track and ghost relative to the fixed treadmill calibration.
+        // Presents the track and ghost relative to the calibrated floor point.
         public void ApplyGhostPresentation()
         {
-            if (UsesTreadmillPlacement && RunState == RunningSession.RunState.Paused)
+            if (UsesRelativePlacement && RunState == RunningSession.RunState.Paused)
             {
                 _presentationStatus = IsSideBySide && (PerformanceSource == null || !PerformanceSource.HasFreshInput)
                     ? "BeltSignalUnavailable"
@@ -294,15 +396,15 @@ namespace PaceScape.Tracking
                 return;
             }
             _presentationVisible = false;
-            _presentationStatus = UsesTreadmillPlacement ? "CalibrationRequired" : "Track";
-            double travelledMetres = PerformanceSource != null ? PerformanceSource.MeasuredDistanceMetres : 0;
+            _presentationStatus = UsesRelativePlacement ? "CalibrationRequired" : "Track";
+            bool isWaitingToRun = RunState == RunningSession.RunState.Ready || RunState == RunningSession.RunState.Countdown;
             foreach (MarkerVisual marker in _markers.Values)
             {
                 if (marker.Motion == null)
                 {
                     continue;
                 }
-                if (!UsesTreadmillPlacement)
+                if (!UsesRelativePlacement)
                 {
                     if (marker.HasTreadmillTrackPose && marker.Track != null)
                     {
@@ -317,43 +419,65 @@ namespace PaceScape.Tracking
                     marker.Motion.SetPresentationPose(Pose.identity, false);
                     continue;
                 }
-                Pose trackPose = TreadmillGhostPresentation.EvaluateTrackPose(_spawnLane, marker.GhostOrigin,
-                    travelledMetres, out double laneMetres);
+                bool reverse = marker.ReverseGhostDirection;
+                Pose trackPose = TreadmillGhostPresentation.EvaluateDirectedTrackPose(_spawnLane, marker.GhostOrigin,
+                    _trackTravelledMetres, reverse, out double laneMetres);
                 if (marker.Track != null)
                 {
                     marker.Track.SetLocalPositionAndRotation(trackPose.position, trackPose.rotation);
                     marker.HasTreadmillTrackPose = true;
                 }
-                if (IsSideBySide)
+                if (UsesCompanionPlacement)
                 {
-                    marker.Motion.SetPresentationPose(
-                        _ghostPresentation.EvaluateSideBySide(_spawnLane, marker.GhostOrigin), true);
+                    Pose companionPose;
+                    if (IsManual)
+                    {
+                        _ghostPresentation.EvaluateDirectedGhost(_spawnLane, laneMetres, trackPose, 0,
+                            true, false, reverse, out companionPose);
+                    }
+                    else
+                    {
+                        companionPose = _ghostPresentation.EvaluateDirectedCompanion(_spawnLane, marker.GhostOrigin, reverse);
+                    }
+                    marker.Motion.SetPresentationPose(companionPose, true);
                     _presentationVisible = true;
-                    _presentationStatus = RunState == RunningSession.RunState.Ready ? "Ready" : "SideBySide";
+                    _presentationStatus = isWaitingToRun ? "Ready" : Mode.ToString();
                     continue;
                 }
 
-                double gap = 0;
-                bool hasGap = RunState == RunningSession.RunState.Ready ||
-                    (PerformanceSource != null && PerformanceSource.TryGetGhostGap(out gap));
-                bool inRange = _ghostPresentation.Evaluate(_spawnLane, laneMetres, trackPose,
-                    gap - _distanceBehindStartLine, out Pose pose);
+                bool isReplay = Mode == RunningSession.RunnerMode.AllTimePersonalBest;
+                bool hasGap = isReplay || isWaitingToRun || IsManual ||
+                    (PerformanceSource != null && PerformanceSource.TryGetGhostGap(out _));
+                double gap = marker.Motion.TravelledMetres - _trackTravelledMetres;
+                double displayGap = gap - _distanceBehindStartLine;
+                bool inRange = _ghostPresentation.EvaluateDirectedGhost(_spawnLane, laneMetres, trackPose,
+                    displayGap, isReplay && IsManual, isReplay, reverse, out Pose pose);
                 _presentationVisible = hasGap && inRange;
                 marker.Motion.SetPresentationPose(pose, _presentationVisible);
                 _presentationStatus = !hasGap ? "MeasurementUnavailableResetRequired" : !inRange ? "OutsideVisibleRange" :
-                    RunState == RunningSession.RunState.Ready ? "Ready" : "Relative";
+                    isWaitingToRun ? "Ready" : "Relative";
             }
         }
 
         // Reports presentation capability and calibration separately from run/measurement validity.
         public GhostPresentationState CaptureGhostPresentation()
         {
+            bool reverseDirection = false;
+            if (HasGhostCalibration)
+            {
+                foreach (MarkerVisual marker in _markers.Values)
+                {
+                    reverseDirection = marker.ReverseGhostDirection;
+                }
+            }
+
             return new GhostPresentationState
             {
-                mode = IsSideBySide ? "SideBySide" : _ghostPresentation.Enabled ? "TreadmillRelative" : "Track",
+                mode = IsManual ? "Manual" : UsesCompanionPlacement ? "SideBySide" : _ghostPresentation.Enabled ? "TreadmillRelative" : "Track",
                 sideOffsetMetres = _ghostPresentation.SideOffsetMetres,
                 visibilityDistanceMetres = _ghostPresentation.VisibilityDistanceMetres,
                 calibrated = HasGhostCalibration,
+                reverseDirection = reverseDirection,
                 visible = _presentationVisible && _hasHeadTracking && RunnableMarkerCount == 1,
                 status = _presentationStatus
             };
@@ -387,7 +511,7 @@ namespace PaceScape.Tracking
             _paceMinutesPerKilometre = paceMinutesPerKilometre;
             _spawnLane = lane;
             _distanceBehindStartLine = distanceBehindStartLine;
-            if (changesPosition && UsesTreadmillPlacement)
+            if (changesPosition && UsesRelativePlacement)
             {
                 ApplyGhostPresentation();
             }
@@ -403,19 +527,88 @@ namespace PaceScape.Tracking
         // Starts from the configured position only after all current placements are tracked.
         public bool TryStartRun(float paceMinutesPerKilometre, int lane, float distanceBehindStartLine)
         {
+            return TryScheduleRunStart(paceMinutesPerKilometre, lane, distanceBehindStartLine, null);
+        }
+
+        internal bool TryScheduleRunStart(float paceMinutesPerKilometre, int lane, float distanceBehindStartLine,
+            Action<bool> startRequested)
+        {
             if (_runSession.State != RunningSession.RunState.Ready || !CanRun)
             {
                 return false;
             }
 
-            return TryConfigureRunner(paceMinutesPerKilometre, lane, distanceBehindStartLine) &&
-                _runSession.TryStart(CanRun);
+            if (!TryConfigureRunner(paceMinutesPerKilometre, lane, distanceBehindStartLine) ||
+                !_runSession.TryBeginCountdown(CanRun))
+            {
+                return false;
+            }
+
+            _runStartRequested = startRequested;
+            Camera camera = _xrOrigin != null ? _xrOrigin.Camera : null;
+            if (camera != null)
+            {
+                _runCountdownView = new CountdownView(camera, camera.gameObject.layer, "Run countdown");
+                _runCountdownView.Show(RunCountdownSeconds);
+            }
+            return true;
+        }
+
+        /// <summary>Gets the visible seconds remaining until the run start is requested.</summary>
+        public int RunCountdownSeconds => Mathf.CeilToInt(_runSession.CountdownRemaining);
+
+        internal bool CompleteRunStart()
+        {
+            _runCountdownView?.Dispose();
+            _runCountdownView = null;
+            return _runSession.TryCompleteCountdown(CanRun);
         }
 
         // Pauses movement while retaining positions, anchors and the selected settings.
         public bool TryPauseRun()
         {
-            return _runSession.TryPause();
+            bool paused = _runSession.TryPause();
+            CancelRunCountdown();
+            return paused;
+        }
+
+        private void CancelRunCountdown()
+        {
+            _runCountdownView?.Dispose();
+            _runCountdownView = null;
+            Action<bool> request = _runStartRequested;
+            _runStartRequested = null;
+            request?.Invoke(false);
+        }
+
+        private void UpdateRunCountdown(float deltaTime)
+        {
+            if (RunState != RunningSession.RunState.Countdown)
+            {
+                return;
+            }
+            if (!CanRun)
+            {
+                TryPauseRun();
+                return;
+            }
+
+            bool expired = _runSession.TickCountdown(deltaTime);
+            _runCountdownView?.Show(RunCountdownSeconds);
+            _runCountdownView?.UpdateLayout();
+            if (expired)
+            {
+                Action<bool> request = _runStartRequested;
+                _runStartRequested = null;
+                if (request != null)
+                {
+                    request(true);
+                }
+                else if (!CompleteRunStart())
+                {
+                    TryPauseRun();
+                }
+            }
         }
 
         // Resumes a paused run only when all existing placements are tracked again.
@@ -427,6 +620,7 @@ namespace PaceScape.Tracking
         // Stops movement and returns existing objects to their configured start positions.
         public void ResetRun()
         {
+            _trackTravelledMetres = 0;
             StopWarmup();
             _runSession.Reset();
             PerformanceSource?.ResetSession();
@@ -435,6 +629,7 @@ namespace PaceScape.Tracking
                 marker.Motion?.ResetToStart();
             }
             ApplyGhostPresentation();
+            CancelRunCountdown();
         }
 
         // Updates detector settings; the caller must restart active tracking to apply them.
@@ -455,6 +650,8 @@ namespace PaceScape.Tracking
 
         private readonly RunnerWarmup _warmup = new RunnerWarmup();
         private WarmupCoachView _warmupCoach;
+        private CountdownView _runCountdownView;
+        private Action<bool> _runStartRequested;
         private readonly RunningSession _runSession = new RunningSession();
         private bool _hasHeadTracking;
         private readonly Dictionary<ulong, MarkerVisual> _markers = new Dictionary<ulong, MarkerVisual>();
@@ -487,6 +684,7 @@ namespace PaceScape.Tracking
             public Transform Track;
             public bool HasTreadmillTrackPose;
             public bool HasGhostCalibration;
+            public bool ReverseGhostDirection;
             public Vector3 GhostOrigin;
         }
 
@@ -1021,10 +1219,11 @@ namespace PaceScape.Tracking
         private bool UpdateVisuals()
         {
             double beltSpeed = 0;
-            if (IsSideBySide && (PerformanceSource == null ||
-                !PerformanceSource.TryGetBeltSpeedMetresPerSecond(out beltSpeed)))
+            bool hasBeltSpeed = UsesRelativePlacement && !IsManual && PerformanceSource != null &&
+                PerformanceSource.TryGetBeltSpeedMetresPerSecond(out beltSpeed);
+            if (IsSideBySide && !IsManual && !hasBeltSpeed)
             {
-                _runSession.TryPause();
+                TryPauseRun();
             }
 
             float effectivePace = IsSideBySide ? 0 : ActivePaceMinutesPerKilometre;
@@ -1034,13 +1233,14 @@ namespace PaceScape.Tracking
             {
                 if (marker.Anchor == null || marker.Anchor.pending || marker.Anchor.trackingState != TrackingState.Tracking)
                 {
-                    _runSession.TryPause();
+                    TryPauseRun();
                     break;
                 }
             }
 
             bool recorded = Mode == RunningSession.RunnerMode.AllTimePersonalBest && PerformanceSource != null;
             bool canAdvance = _runSession.State == RunningSession.RunState.Running;
+            AdvanceTrack(Time.unscaledDeltaTime, beltSpeed);
             double recordedTravel = 0;
             if (recorded && canAdvance)
             {
@@ -1079,13 +1279,9 @@ namespace PaceScape.Tracking
 
                 if (isTracked && wasVisible)
                 {
-                    if (IsSideBySide && marker.Motion != null)
+                    if (UsesCompanionPlacement && marker.Motion != null)
                     {
-                        float delta = Time.unscaledDeltaTime;
-                        double speed = canAdvance ? beltSpeed : 0;
-                        // Keep the companion beside the belt while its gait follows the measured speed.
-                        marker.Motion.AdvanceRecorded(delta, speed * delta, speed);
-                        PerformanceSource?.ObserveGhostDistance(marker.Motion.TravelledMetres);
+                        AdvanceCompanion(marker.Motion, Time.unscaledDeltaTime, beltSpeed);
                     }
                     else if (recorded && canAdvance)
                     {
@@ -1103,9 +1299,31 @@ namespace PaceScape.Tracking
                 }
             }
 
+            UpdateRunCountdown(Time.unscaledDeltaTime);
             UpdateWarmup(Time.unscaledDeltaTime);
             ApplyGhostPresentation();
             return true;
+        }
+
+        private double TrackSpeed(double beltSpeed)
+        {
+            return IsManual ? _manualTrackSpeedKmh / 3.6 : beltSpeed;
+        }
+
+        private void AdvanceTrack(float delta, double beltSpeed)
+        {
+            if (UsesRelativePlacement && RunState == RunningSession.RunState.Running)
+            {
+                _trackTravelledMetres += delta * TrackSpeed(beltSpeed);
+            }
+        }
+
+        private void AdvanceCompanion(RunningTrackMotion motion, float delta, double beltSpeed)
+        {
+            double speed = RunState == RunningSession.RunState.Running ? TrackSpeed(beltSpeed) : 0;
+            // Use the same speed for track travel and the companion gait.
+            motion.AdvanceRecorded(delta, speed * delta, speed);
+            PerformanceSource?.ObserveGhostDistance(motion.TravelledMetres);
         }
 
         private void UpdateWarmup(float deltaTime)
@@ -1143,7 +1361,7 @@ namespace PaceScape.Tracking
             // Plane extraction is asynchronous; keep observations while looking at the surface.
             if (!_pendingMarkers.ContainsKey(markerId))
             {
-                if (_markers.Count + _pendingMarkers.Count >= (UsesTreadmillPlacement ? 1 : _maxTrackedMarkers))
+                if (_markers.Count + _pendingMarkers.Count >= (UsesRelativePlacement ? 1 : _maxTrackedMarkers))
                 {
                     return;
                 }
@@ -1209,7 +1427,7 @@ namespace PaceScape.Tracking
         {
             StopWarmup("TrackingLost");
             _hasHeadTracking = false;
-            _runSession.TryPause();
+            TryPauseRun();
             foreach (MarkerVisual marker in _markers.Values)
             {
                 if (marker.Instance != null && marker.Instance.activeSelf)
@@ -1463,8 +1681,10 @@ namespace PaceScape.Tracking
         // Tears down the detector, scanning, anchors, and owned content.
         private void ReleaseResources()
         {
+            _trackTravelledMetres = 0;
             StopWarmup("TrackingLost");
             _runSession.Reset();
+            CancelRunCountdown();
             PerformanceSource?.ResetSession();
             _hasHeadTracking = false;
             _startupAttempt++;

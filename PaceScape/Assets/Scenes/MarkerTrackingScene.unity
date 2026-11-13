@@ -379,7 +379,7 @@ MonoBehaviour:
   _planePlacement: {fileID: 1994466230}
   _markerLength: 0.1
   _startupTimeoutSeconds: 15
-  _maxTrackedMarkers: 64
+  _maxTrackedMarkers: 1
   _startupPhase: 0
   _startupStatus: 
   _startupError: 

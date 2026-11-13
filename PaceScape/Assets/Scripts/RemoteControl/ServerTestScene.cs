@@ -14,6 +14,7 @@ namespace PaceScape.RemoteControl
         [SerializeField] private GameObject _runnerPrefab;
         [SerializeField] private Camera _previewCamera;
         private readonly RunningSession _session = new RunningSession();
+        private CountdownView _countdownView;
         private GameObject _runner;
         private RunningTrackMotion _motion;
         private float _pace = 6f;
@@ -37,7 +38,16 @@ namespace PaceScape.RemoteControl
         // Changes mode while retaining the visual position and pausing an active run.
         public bool TrySetRunnerMode(string mode)
         {
-            if (mode == nameof(RunningSession.RunnerMode.SideBySide))
+            if (mode == "Stadium")
+            {
+                if (RunState != RunningSession.RunState.Ready)
+                {
+                    return false;
+                }
+                mode = nameof(RunningSession.RunnerMode.FixedPace);
+            }
+
+            if (mode == nameof(RunningSession.RunnerMode.SideBySide) || mode == nameof(RunningSession.RunnerMode.Manual))
             {
                 return false;
             }
@@ -72,6 +82,17 @@ namespace PaceScape.RemoteControl
         {
             if (HasRunner && !_isPaused)
             {
+                if (_session.State == RunningSession.RunState.Countdown)
+                {
+                    if (_session.TickCountdown(Time.unscaledDeltaTime))
+                    {
+                        _session.TryCompleteCountdown(CanRun);
+                    }
+                    _countdownView?.Show(RunCountdownSeconds);
+                    _countdownView?.UpdateLayout();
+                    return;
+                }
+
                 if (_session.State == RunningSession.RunState.Running &&
                     _session.Mode == RunningSession.RunnerMode.AllTimePersonalBest && PerformanceSource != null)
                 {
@@ -100,7 +121,10 @@ namespace PaceScape.RemoteControl
         public void PauseRun()
         {
             _session.TryPause();
+            _countdownView?.Dispose();
         }
+
+        private int RunCountdownSeconds => Mathf.CeilToInt(_session.CountdownRemaining);
 
         // Spawns exactly one waiting visual using the complete validated settings.
         public bool TrySpawnRunner(float pace, int lane, float startDistance)
@@ -150,6 +174,7 @@ namespace PaceScape.RemoteControl
         // Removes the test visual and ends the run while preserving the scene track.
         public void RemoveRunner()
         {
+            _countdownView?.Dispose();
             _session.Reset();
             _motion = null;
             if (_runner != null)
@@ -227,15 +252,22 @@ namespace PaceScape.RemoteControl
                 case "run.start":
                     success = CanRun && _session.State == RunningSession.RunState.Ready &&
                         TryConfigureRunner(p.paceMinutesPerKilometre, p.spawnLane, p.distanceBehindStartLine) &&
-                        _session.TryStart(CanRun);
+                        _session.TryBeginCountdown(CanRun);
+                    if (success && _previewCamera != null)
+                    {
+                        _countdownView = new CountdownView(_previewCamera, _previewCamera.gameObject.layer, "Run countdown");
+                        _countdownView.Show(RunCountdownSeconds);
+                    }
                     break;
                 case "run.pause":
                     success = _session.TryPause();
+                    _countdownView?.Dispose();
                     break;
                 case "run.resume":
                     success = _session.TryResume(CanRun);
                     break;
                 case "run.reset":
+                    _countdownView?.Dispose();
                     _session.Reset();
                     PerformanceSource?.ResetSession();
                     _motion?.ResetToStart();
@@ -271,6 +303,7 @@ namespace PaceScape.RemoteControl
                 runnerMode = _session.Mode.ToString(),
                 activeRunnerPace = PerformanceSource != null ? PerformanceSource.GetTargetPace(_session.Mode, _pace) : _pace,
                 runState = _session.State.ToString(),
+                runCountdownSeconds = RunCountdownSeconds,
                 canRun = CanRun,
                 paceMinutesPerKilometre = _pace,
                 spawnLane = _lane,

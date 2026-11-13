@@ -72,7 +72,8 @@ Restart the app after changing this file. Without the file, saved project/build 
 ## Supported behavior
 
 - `runner.configure`: validates and applies pace, lane and start offset as one command. Existing waiting objects move to the configured start. Positional changes are rejected while Running or Paused; the target pace can still be changed live.
-- `run.start`: includes the complete runner settings and starts only a Ready run with all placed objects visibly tracked. New placements always wait for an explicit start. No automatic start is queued when placement is missing.
+- `run.start`: includes the complete runner settings and begins a visible 3–2–1 countdown from Ready with all placed objects visibly tracked. It applies to all supported runner modes. The run starts after the countdown. Tracking or connection loss cancels a pending start. The dashboard receives `runState: "Countdown"` and `runCountdownSeconds`.
+- `treadmill.startRun`: counts down before requesting the FTMS motor start. The virtual run starts after FTMS acknowledgement. The dashboard keeps the command pending through both steps.
 - `run.pause`, `run.resume`: hold and continue the same positions. Resume requires recovered tracked content; it does not implicitly apply unsaved form input.
 - `run.reset`: ends the run, returns objects to their configured start and retains anchors/track. It permits subsequent lane/offset changes.
 - Legacy `runner.pace` and `runner.spawn` remain supported with the same validation rules; positional edits now update waiting objects and fail during active or paused runs.
@@ -95,7 +96,7 @@ Runtime scene/prefab reference changes, BLE, treadmill data, heart rate and trai
 
 The server sends a `control` application heartbeat each second. Unity pauses a Running session on observed disconnect, or after six seconds without a recently received control heartbeat, and reconnects. Recovery never starts or resumes a run automatically. Closing only a browser tab does not sever the headset/server connection or pause the run.
 
-The server supports one headset and multiple dashboards, checks same-origin browser upgrades, requires a key for LAN binding, caps messages at 16 KiB and 30/s per connection, pings for liveness and permits one pending command globally. It rejects commands if state is over five seconds old. Commands time out after eight seconds. Unity rejects commands queued on its main thread for over three seconds. A timeout/disconnect does not prove an already-started operation was never applied; inspect current state before resending.
+The server supports one headset and multiple dashboards, checks same-origin browser upgrades, requires a key for LAN binding, caps messages at 16 KiB and 30/s per connection, pings for liveness and permits one pending command globally. It rejects commands if state is over five seconds old. Commands time out after eight seconds, with three extra seconds for the countdown before FTMS motor start. Unity rejects commands queued on its main thread for over three seconds. A timeout/disconnect does not prove an already-started operation was never applied; inspect current state before resending.
 
 The server's `PROTOCOL.md` documents exact camelCase envelopes and payloads. `npm run simulate` starts a deliberately labelled simulated headset. Stop it before connecting the real app.
 

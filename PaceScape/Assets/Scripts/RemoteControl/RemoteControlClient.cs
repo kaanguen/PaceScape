@@ -378,7 +378,7 @@ namespace PaceScape.RemoteControl
         }
 
         // Checks command eligibility before starting an asynchronous FTMS operation.
-        private bool TryBeginBeltCommand(RemoteMessage message, out string error)
+        private bool TryBeginBeltCommand(RemoteMessage message, out string error, bool afterCountdown = false)
         {
             if (_treadmill == null || !CanUseMotorControl() || message.payload == null)
             {
@@ -388,14 +388,45 @@ namespace PaceScape.RemoteControl
 
             RemotePayload payload = message.payload;
             bool startsRun = message.commandType == "treadmill.startRun";
-            if (startsRun && (_tracker == null || !_tracker.CanRun || _tracker.RunState != RunningSession.RunState.Ready ||
-                !_tracker.TryConfigureRunner(payload.paceMinutesPerKilometre, payload.spawnLane, payload.distanceBehindStartLine)))
+            bool resumesRun = message.commandType == "treadmill.resumeRun";
+            if ((startsRun || resumesRun) && _tracker != null && _tracker.RunEnvironment != "FTMS")
             {
+                error = "Starting the treadmill requires the FTMS run environment.";
+                return false;
+            }
+            ConnectionSession session = _session;
+            if (startsRun && !afterCountdown)
+            {
+                if (_tracker != null && _tracker.TryScheduleRunStart(payload.paceMinutesPerKilometre,
+                    payload.spawnLane, payload.distanceBehindStartLine, elapsed =>
+                    {
+                        if (!elapsed || _session != session || !session.IsConnected ||
+                            session.Cancellation.IsCancellationRequested || _isPaused ||
+                            Time.unscaledTime - _lastControlAt >= 3f)
+                        {
+                            if (elapsed)
+                            {
+                                _tracker.TryPauseRun();
+                            }
+                            SendAcknowledgement(session, message.commandId, false, "Laufstart abgebrochen.");
+                            return;
+                        }
+
+                        if (!TryBeginBeltCommand(message, out string startError, afterCountdown: true))
+                        {
+                            _tracker.TryPauseRun();
+                            SendAcknowledgement(session, message.commandId, false, startError);
+                        }
+                    }))
+                {
+                    error = null;
+                    return true;
+                }
+
                 error = "Run start requires valid runner settings and a tracked placement.";
                 return false;
             }
 
-            bool resumesRun = message.commandType == "treadmill.resumeRun";
             if (resumesRun && (_tracker == null || !_tracker.CanRun || _tracker.RunState != RunningSession.RunState.Paused))
             {
                 error = "Zum Weiterlaufen muss der pausierte Ghost wieder vollständig getrackt sein.";
@@ -421,12 +452,11 @@ namespace PaceScape.RemoteControl
                 _tracker?.ResetRun();
             }
 
-            ConnectionSession session = _session;
             bool requested = _treadmill.TryControlBelt(payload.deviceId, operation, payload.targetSpeedUnits,
                 () => _session == session && !_isPaused && session.IsConnected &&
                     !session.Cancellation.IsCancellationRequested && Time.unscaledTime - _lastControlAt < 3f &&
-                    (operation != BeltOperation.Start || _tracker.CanRun &&
-                        _tracker.RunState == (resumesRun ? RunningSession.RunState.Paused : RunningSession.RunState.Ready)),
+                    (operation != BeltOperation.Start || _tracker.RunEnvironment == "FTMS" && _tracker.CanRun &&
+                        _tracker.RunState == (resumesRun ? RunningSession.RunState.Paused : RunningSession.RunState.Countdown)),
                 result =>
                 {
                     if (_session != session || !session.IsConnected)
@@ -434,10 +464,14 @@ namespace PaceScape.RemoteControl
                         return;
                     }
 
-                    if (result == null && startsRun &&
-                        !_tracker.TryStartRun(payload.paceMinutesPerKilometre, payload.spawnLane, payload.distanceBehindStartLine))
+                    if (result == null && startsRun && !_tracker.CompleteRunStart())
                     {
                         result = "Das Laufband hat den Start bestätigt, aber der Ghost konnte nicht starten. Laufband an der Konsole prüfen.";
+                    }
+
+                    if (result != null && startsRun && _tracker.RunState == RunningSession.RunState.Countdown)
+                    {
+                        _tracker.TryPauseRun();
                     }
 
                     if (result == null && resumesRun && !_tracker.TryResumeRun())
@@ -547,12 +581,19 @@ namespace PaceScape.RemoteControl
                     ghostControlVersion = 1,
                     ghostPresentationVersion = 1,
                     sideBySideVersion = 1,
+                    manualModeVersion = 1,
+                    manualTrackSpeedVersion = 1,
+                    manualTrackSpeedKmh = _tracker.ManualTrackSpeedKmh,
+                    runSetupVersion = 1,
+                    runEnvironment = _tracker.RunEnvironment,
+                    ghostMode = _tracker.GhostMode,
                     ghostPresentation = _tracker.CaptureGhostPresentation(),
                     runnerMode = _tracker.Mode.ToString(),
                     comparisonControlVersion = 1,
                     performance = _performance != null ? _performance.CaptureState() : null,
                     activeRunnerPace = _tracker.ActivePaceMinutesPerKilometre,
                     runState = _tracker.RunState.ToString(),
+                    runCountdownSeconds = _tracker.RunCountdownSeconds,
                     runnableMarkers = _tracker.RunnableMarkerCount,
                     canRun = _tracker.CanRun,
                     paceMinutesPerKilometre = _tracker.PaceMinutesPerKilometre,
